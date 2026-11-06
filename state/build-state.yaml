@@ -1,12 +1,21 @@
-# Build state — the ledger.
+# Build state — the ledger and the task in flight, in one file.
 #
-# Authoritative record of what has actually landed. Overrides any other view of
-# what is done, including a confident agent's summary of its own run.
+# Authoritative record of what has actually landed. It overrides any other view
+# of what is done, including a confident agent's summary of its own run.
+#
+# Two sections matter:
+#
+#   steps:    what landed, ever.            A fact.
+#   current:  what is being worked on now.  An intention.
+#
+# When they disagree, `steps` wins. An agent that finds `current` claiming a
+# step is in_progress while `steps` already records it done is looking at a
+# dead entry — it REPORTS that and does not resolve it.
 #
 # Updated by the orchestrator after each step, and by nobody else.
 
 meta:
-  version: 1
+  version: 2
   last_updated: null
   last_updated_note: >
     Replace with what the session actually did, not what it intended. A note
@@ -36,6 +45,90 @@ steps: []
   #   note: >
   #     What a reader six weeks from now needs and cannot reconstruct from the
   #     diff. Empty is better than a restatement of the title.
+
+# ---------------------------------------------------------------------------
+# current — the one task in flight. Exactly ONE at a time.
+#
+# Lifecycle
+#
+#   idle ──start──▶ in_progress ──┬──▶ done     → reset to idle
+#                                 └──▶ blocked  → stays, with blocked_reason
+#
+#   `blocked` is NOT idle. It holds the slot deliberately: the next agent must
+#   read why the last one stopped before starting anything.
+#
+# Field reference
+#
+#   id                Sxx, from reports/plan/implementation-plan.md
+#   phase             the phase id from service.yaml (tier S and M: `main`)
+#   contract          the contract file that phase names. Never two at once.
+#
+#   scope.files_allowed  paths this task may write. A write outside this list is
+#                        a reject in review, however good the change.
+#   scope.repos_allowed  harness | target. NEVER a reference repository.
+#
+#   depends_on.decisions   PD ids that must be DECIDED first. An OPEN blocking
+#                          entry here means REFUSE the task, not work around it.
+#   depends_on.questions   Q ids that must be CLOSED first.
+#   depends_on.steps       Sxx that must be done first
+#
+#   verification.checks         checks/*.sh to run, with their expected exit code
+#   verification.cases          acceptance case ids that must pass
+#   verification.expected_result  concrete enough that two people would agree
+#                                 whether it holds
+#
+#   status            idle | in_progress | blocked | done
+#   blocked_reason    required when status is blocked. Say what would unblock it.
+#
+# Worked example — what a started task looks like
+#
+#   current:
+#     id: S07
+#     title: Implement GET /api/v1/tasks/{taskId}
+#     phase: main
+#     contract: architecture.yaml
+#     started_at: "2026-11-06T09:14:00Z"
+#     scope:
+#       files_allowed:
+#         - src/main/java/com/example/vendortask/adapter/in/web/TaskController.java
+#         - src/test/java/com/example/vendortask/adapter/in/web/TaskControllerTest.java
+#       repos_allowed: [target]
+#     depends_on:
+#       decisions: [PD-001]
+#       questions: []
+#       steps: [S03]
+#     verification:
+#       checks:
+#         - {script: checks/architecture.sh, expect: 0}
+#         - {script: checks/forbidden-tech.sh, expect: 0}
+#       cases: [A-E1-01, A-E1-02, A-E1-03]
+#       expected_result: >
+#         GET /api/v1/tasks/7 answers 200 with the body recorded in
+#         acceptance/expected/A-E1-01.json, X-TRACE-ID present, and vendor.name
+#         absent when the vendor lookup exhausts its retry budget.
+#     status: in_progress
+#     blocked_reason: null
+# ---------------------------------------------------------------------------
+
+current:
+  id: null
+  title: null
+  phase: main
+  contract: architecture.yaml
+  started_at: null
+  scope:
+    files_allowed: []
+    repos_allowed: [harness]
+  depends_on:
+    decisions: []
+    questions: []
+    steps: []
+  verification:
+    checks: []
+    cases: []
+    expected_result: null
+  status: idle
+  blocked_reason: null
 
 blocked_by:
   decisions: []

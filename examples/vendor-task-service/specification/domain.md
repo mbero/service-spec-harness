@@ -19,13 +19,13 @@ question (E1-B03) and not a data question.
 **Expressed by:** E1-B01, E1-B03
 **Source:** interview 2026-11-06, M.B.
 
-### BR-2 — A blank title is not a title
+### BR-2 — A vendor name is a snapshot, not a live value
 
-Leading and trailing whitespace is trimmed before the check, so a title of
-spaces only is blank.
+The name returned with a task is the name vendor-service gave at read time.
+Whether that read may come from a cache is undecided — see Q-001.
 
-**Expressed by:** E2-B02
-**Source:** ADR-9
+**Expressed by:** E1-B04 (open)
+**Source:** interview 2026-11-06, M.B.
 
 ## Explicitly out of scope
 

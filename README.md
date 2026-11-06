@@ -48,7 +48,7 @@ edited away:
 
 1. `.claude/settings.json` → `permissions.deny` blocks every write to the path.
 2. `checks/harness.sh` fails if that deny rule goes missing or gets misspelled.
-3. `prompts/review.md` makes *"did this step touch `acceptance/`?"* an automatic
+3. `.claude/agents/build-reviewer.md` makes *"did this step touch `acceptance/`?"* an automatic
    reject, independent of how good the change looks.
 
 An approval whose `by:` field looks like an agent name is itself a violation,
@@ -105,8 +105,9 @@ Every statement in `specification/` must be capable of being **shown false by
 running something**. A statement that cannot fail is not a requirement.
 
 - `"the API should be intuitive"` — cannot fail. Not a requirement.
-- `"a POST with a title of spaces only answers 400 with a problem+json body
-  naming the field title"` — can fail. Becomes acceptance case `A-E2-02`.
+- `"a GET for a task id that does not exist answers 404 with a problem+json
+  body naming the requested id"` — can fail. Becomes acceptance case
+  `A-E1-02`.
 
 Three fields carry the weight:
 
@@ -133,10 +134,10 @@ consequence of each, or it does not count as a question.
 | `specification/` | endpoints, behaviours, integrations, non-functionals |
 | `acceptance/` | **the oracle** — cases, expected bodies, upstream fixtures |
 | `gaps/open-questions.yaml` | what nobody has decided yet |
-| `decisions.md` + `decisions.yaml` | the decision registry, prose and machine index |
+| `decisions.yaml` | the decision registry — every decision an agent may not take alone |
 | `checks/` | the gates, plus the selftest that proves each one can fail |
-| `prompts/` | the shared system prompt and five role prompts |
-| `state/` | the lock (`current-task.yaml`) and the ledger (`build-state.yaml`) |
+| `prompts/system.md` | the shared system prompt; each role prompt lives inside its agent file |
+| `state/build-state.yaml` | the ledger: what has landed, and the one task in flight |
 | `.claude/` | five subagents, five slash commands, the deny rules |
 | `examples/vendor-task-service/` | a complete worked instantiation — and the selftest fixture |
 | `docs/design-notes.md` | why it is shaped this way, and what was deliberately dropped |

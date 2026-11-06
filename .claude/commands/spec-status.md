@@ -1,14 +1,16 @@
 ---
-description: Where the build stands — specification coverage, open questions, blocking decisions, the lock, check results
+description: Where the build stands — specification coverage, open questions, blocking decisions, the task in flight, check results
 ---
 
 Read-only. Safe as the first command in any session: it surfaces the two things
-that invalidate everything downstream — an unapproved oracle and a held lock.
+that invalidate everything downstream — an unapproved oracle and a step left
+in flight.
 
 Report, in this order, and say plainly where a source was unreadable:
 
-1. **The lock** — `state/current-task.yaml`: status, `claimed_by`, `claimed_at`,
-   and whether it looks stale. Report a stale lock; never clear it.
+1. **The task in flight** — `current` in `state/build-state.yaml`: its id,
+   `status` and `started_at`. Report a `blocked` entry and what would unblock
+   it.
 2. **Specification coverage** — run `checks/spec-completeness.sh` and quote its
    summary lines: endpoints, behaviours by status, cases, coverage, open
    questions.

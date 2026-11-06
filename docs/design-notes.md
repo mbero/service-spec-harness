@@ -87,6 +87,6 @@ rather than aspirational.
 - **Overhead on small work.** For three CRUD endpoints this is more work than
   writing the service. `tier: S` exists to say so honestly rather than to hide
   it behind ceremony nobody runs twice.
-- **A cold registry.** `decisions.md` starts empty. Its value accumulates; for
+- **A cold registry.** `decisions.yaml` starts empty. Its value accumulates; for
   the first two weeks of any build it is thinner than the comparison that
   inspired it.

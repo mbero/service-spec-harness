@@ -1,12 +1,50 @@
-# Machine-readable index of decisions.md.
+# Decision registry — every decision an agent is not allowed to take alone.
 #
-# decisions.md is authoritative for the prose. This file carries only what
-# tooling needs: checks use `blocking` to refuse work, and spec-completeness
-# uses the id set to resolve `evidence: "PD-nnn"`.
+# One file, machine-readable. `checks/spec-completeness.sh` resolves
+# `evidence: "PD-nnn"` against the id set here, and the orchestrator reads
+# `blocking` to refuse work.
 #
-# checks/harness.sh verifies that the id sets match.
+# ---------------------------------------------------------------------------
+# How an entry is used
+# ---------------------------------------------------------------------------
+#
+# - An agent that hits a **red** authority item (see `architecture.yaml`
+#   `agent-authority`) appends a new `PD-nnn` with `status: OPEN` and stops.
+# - `blocking: [...]` names what cannot be built until the entry is DECIDED.
+#   The orchestrator refuses to schedule a step whose behaviours depend on an
+#   open blocking entry.
+# - `specification/*.yaml` may cite an entry as `evidence: "PD-nnn"`.
+#
+# ---------------------------------------------------------------------------
+# Entry format
+# ---------------------------------------------------------------------------
+#
+#   - id: PD-nnn
+#     title: <one line>
+#     status: OPEN | DECIDED
+#     risk: LOW | MEDIUM | HIGH | CRITICAL
+#     authority: yellow | red
+#     blocking: [E1-B03, I1]        # what cannot be built until DECIDED
+#     raised_on: "2026-11-06"
+#     raised_by: spec-author
+#     question: >
+#       One paragraph, answerable.
+#     evidence: >
+#       What is already known, with sources.
+#     options: >
+#       Each option with its consequence.
+#     decided_on: null              # fill both when status becomes DECIDED
+#     decided_by: null
+#     outcome: >
+#       Empty while OPEN. When DECIDED: what was decided and what it means for
+#       the implementation.
+#
+# An id is never reused and never renumbered. Specification files, review
+# reports and acceptance cases all quote it.
+# ---------------------------------------------------------------------------
 
 meta:
-  version: 1
+  version: 2
 
 decisions: []
+# No decision has been recorded yet. The first one an agent raises goes here.

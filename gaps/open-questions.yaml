@@ -14,7 +14,7 @@
 #     status: open              # open | answered | withdrawn
 #     raised_on: "2026-11-06"
 #     raised_by: spec-author
-#     blocks: [E2-B03]          # behaviour ids that stay `status: open`
+#     blocks: [E1-B04]          # behaviour ids that stay `status: open`
 #     question: >               # one question, answerable, not a topic
 #     why_it_matters: >         # the consequence of guessing wrong
 #     options:                  # at least two, each with its consequence

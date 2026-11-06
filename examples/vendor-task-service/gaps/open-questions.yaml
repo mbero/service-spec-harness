@@ -6,21 +6,24 @@ questions:
     status: open
     raised_on: "2026-11-06"
     raised_by: spec-author
-    blocks: [E2-B03]
+    blocks: [E1-B04]
     question: >
-      POST /api/v1/tasks with an externalRef that already exists — 409 Conflict,
-      or idempotent 200 returning the existing task?
+      GET /api/v1/tasks/{taskId} resolves the vendor on every call. Is the
+      vendor-service response cached between requests, and for how long?
     why_it_matters: >
-      The caller retries on timeout. Under 409 every retry after a successful
-      but unacknowledged create surfaces an error the caller cannot act on.
+      vendor-service rate-limits per consumer. Without a cache a burst of reads
+      on one task exhausts the budget and degrades every other caller, which
+      E1-B03 then hides behind a 200.
     options:
       - id: a
-        option: 409 Conflict
-        consequence: Simple to implement; pushes retry handling onto the caller.
-      - id: b
-        option: Idempotent 200 with the existing task
+        option: No cache; resolve on every request
         consequence: >
-          Requires externalRef to be unique per vendor and makes the endpoint
-          safe to retry; needs a decision on what happens when the payload
-          differs from the stored task.
+          Always current, and the simplest thing to build. The rate limit then
+          constrains read throughput directly.
+      - id: b
+        option: Cache the vendor response for 60 seconds per vendorId
+        consequence: >
+          Removes the burst problem, and makes a renamed vendor visible up to a
+          minute late. Needs a decision on whether E1-B03 degradation is cached
+          as well.
     asked_of: product owner

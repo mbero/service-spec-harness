@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The harness checks itself.
 #
-# Every artefact in this repository is half of a pair: decisions.md and
-# decisions.yaml, service.yaml and the checks that read it, acceptance/ and the
-# deny rule that protects it. Pairs drift. This script is the only thing that
-# notices.
+# Every artefact in this repository is half of a pair: service.yaml and the
+# checks that read it, acceptance/ and the deny rule that protects it, a check
+# script and the selftest case that proves it can fail. Pairs drift. This
+# script is the only thing that notices.
 #
 # Usage: harness.sh [ROOT]   ROOT defaults to the harness root; the selftest
 #                            passes a deliberately broken copy.
@@ -34,33 +34,11 @@ done < <(grep -rn '<<REQUIRED' \
            "$HROOT/service.yaml" "$HROOT/architecture.yaml" \
            "$HROOT/specification" "$HROOT/acceptance/cases" 2>/dev/null \
            | sed "s|^$HROOT/||" \
-           | grep -v '^specification/README.md' \
            | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
 # The last filter drops comment lines. A file is allowed to EXPLAIN the marker
 # convention; it is not allowed to still carry an unfilled one.
 
-# --- 2. decisions.md and decisions.yaml describe the same id set ------------
-if [[ -f "$HROOT/decisions.md" && -f "$HROOT/decisions.yaml" ]]; then
-  MD_IDS="$(grep -oE '^## PD-[0-9]{3}' "$HROOT/decisions.md" | grep -oE 'PD-[0-9]{3}' | sort -u || true)"
-  YML_IDS="$("$PY" - "$HROOT/decisions.yaml" <<'PY'
-import sys, yaml
-d = yaml.safe_load(open(sys.argv[1])) or {}
-for e in (d.get("decisions") or []):
-    if isinstance(e, dict) and e.get("id"):
-        print(str(e["id"]).strip())
-PY
-)"
-  YML_IDS="$(printf '%s\n' "$YML_IDS" | sed '/^$/d' | sort -u)"
-  if [[ "$MD_IDS" != "$YML_IDS" ]]; then
-    violation "decisions.md and decisions.yaml disagree on the decision id set"
-    note "only in decisions.md:   $(comm -23 <(printf '%s\n' "$MD_IDS") <(printf '%s\n' "$YML_IDS") | tr '\n' ' ')"
-    note "only in decisions.yaml: $(comm -13 <(printf '%s\n' "$MD_IDS") <(printf '%s\n' "$YML_IDS") | tr '\n' ' ')"
-  fi
-else
-  violation "decisions.md or decisions.yaml is missing"
-fi
-
-# --- 3. The deny rules that protect the oracle ------------------------------
+# --- 2. The deny rules that protect the oracle ------------------------------
 SETTINGS="$HROOT/.claude/settings.json"
 if [[ ! -f "$SETTINGS" ]]; then
   violation ".claude/settings.json is missing — nothing stops an agent writing to acceptance/"
@@ -84,7 +62,7 @@ PY
   done <<< "$MISSING"
 fi
 
-# --- 4. Manifest consistency ------------------------------------------------
+# --- 3. Manifest consistency ------------------------------------------------
 MANIFEST_FINDINGS="$("$PY" - "$HROOT" <<'PY'
 import sys, os, yaml
 root = sys.argv[1]
@@ -142,7 +120,7 @@ while IFS= read -r line; do
   [[ -n "$line" ]] && violation "$line"
 done <<< "$MANIFEST_FINDINGS"
 
-# --- 5. Every check is covered by the selftest ------------------------------
+# --- 4. Every check is covered by the selftest ------------------------------
 # "Never ship a check that cannot fail" is a rule, so it is checked.
 SELFTEST="$HARNESS_ROOT/checks/selftest.sh"
 if [[ ! -f "$SELFTEST" ]]; then

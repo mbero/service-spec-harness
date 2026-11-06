@@ -120,7 +120,7 @@ expect_fail "an open behaviour whose question vanished" \
 
 W="$(fresh)"; perl -0777 -pi -e 's/^        status: open$/        status: agreed/m' "$W/specification/endpoints.yaml"
 expect_fail "an undecided behaviour quietly marked agreed" \
-  "E2-B03" -- spec_check "$W"
+  "E1-B04" -- spec_check "$W"
 
 # ---------------------------------------------------------------------------
 printf '\n--- harness ---\n'
@@ -129,10 +129,6 @@ printf '\n--- harness ---\n'
 W="$(fresh)"; printf '{\n  "permissions": {\n    "deny": []\n  }\n}\n' > "$W/.claude/settings.json"
 expect_fail "the deny rule protecting the oracle removed" \
   "permissions.deny has no Write(./acceptance/**) rule" -- harness_check "$W"
-
-W="$(fresh)"; perl -0777 -pi -e 's/^  - id: PD-002$/  - id: PD-003/m' "$W/decisions.yaml"
-expect_fail "decisions.md and decisions.yaml drifting apart" \
-  "disagree on the decision id set" -- harness_check "$W"
 
 W="$(fresh)"; perl -0777 -pi -e 's/^  mode: greenfield$/  mode: port/m' "$W/service.yaml"
 expect_fail "port mode with no oracle to point at" \

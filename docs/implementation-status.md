@@ -14,6 +14,11 @@ the worked example all exist and pass. What does not exist yet is the piece that
 `acceptance_cases` in `service.yaml` `validation.required` is a promise rather
 than a gate — see **Next step** below.
 
+**The simplification is done.** `docs/simplification-plan.md` records the
+decisions. The repository went from **82 tracked files to 62**, by merging
+files only. No capability was removed. Every number below is the state after
+that pass.
+
 ---
 
 ## Repository state
@@ -23,12 +28,19 @@ than a gate — see **Next step** below.
 | Path | `/Users/marcinberendt/Priv_Repo/service-spec-harness` |
 | Remote | `https://github.com/mbero/service-spec-harness.git` |
 | Branch | `main` |
-| Commits | **none — the repository has never been committed to** |
-| Working tree | 82 files, ~4415 lines, all untracked |
+| Commits | `ce8b1e8` — the initial commit, 82 files, 4 526 insertions |
+| Working tree | **dirty** — the simplification pass is uncommitted. 20 files deleted, ~25 modified, `docs/simplification-plan.md` added |
+| Tracked files | 62, down from 82 |
 | Python | `uv sync` has been run; `.venv/` and `uv.lock` exist (pyyaml 6.0.3) |
 
-**Nothing has been committed or pushed.** That was deliberate, not an oversight.
-The first commit still needs the user's go-ahead.
+**Nothing has been pushed.** `origin` exists but has never received anything;
+pushing needs its own go-ahead.
+
+The initial commit carries **no ticket key**: this repository has no commit
+history and no ticket prefix in its branch name, so there was no convention to
+match and none was invented. The `<type>: [<KEY>] <subject>` form in
+`service.yaml` is the convention the harness prescribes for the *services it
+builds*, not for itself.
 
 ---
 
@@ -42,7 +54,7 @@ cd /Users/marcinberendt/Priv_Repo/service-spec-harness
 
 # 1. Every gate can actually fail, for its own reason
 checks/selftest.sh
-#    → PASSED  27 selftest case(s): every check has been observed failing for its own reason
+#    → PASSED  26 selftest case(s): every check has been observed failing for its own reason
 
 # 2. The worked example is a valid, complete instantiation
 E=examples/vendor-task-service
@@ -76,7 +88,7 @@ is not an instantiation; `examples/vendor-task-service` is.
 - The write-deny on `acceptance/` is enforced in three overlapping places:
   `.claude/settings.json` `permissions.deny`, a `checks/harness.sh` assertion
   that the rule is still present and spelled correctly, and a mandatory reject
-  condition in `prompts/review.md`.
+  condition in `.claude/agents/build-reviewer.md`.
 
 ### The gates — 8 scripts in `checks/`
 
@@ -86,9 +98,9 @@ is not an instantiation; `examples/vendor-task-service` is.
 | `architecture.sh` | layer rules read from `architecture.yaml` and executed — **no copy of the rules in bash** |
 | `forbidden-tech.sh` | banned libraries, read from `service.yaml` `constraints.forbidden` |
 | `secrets.sh` | credential tripwire over the harness and the target |
-| `harness.sh` | the harness checks itself: drifted file pairs, unfilled markers, a deleted deny rule, a self-contradicting manifest, and **a check script the selftest never exercises** |
+| `harness.sh` | the harness checks itself: unfilled markers, a deleted deny rule, a self-contradicting manifest, and **a check script the selftest never exercises** |
 | `all.sh` | all of the above, aggregated; no `set -e`, so one run shows the whole picture |
-| `selftest.sh` | 24 mutation cases + 3 baseline assertions = 27 |
+| `selftest.sh` | 23 mutation cases + 3 baseline assertions = 26 |
 | `_common.sh` | shared helpers; `MANIFEST_FILE` / `ARCH_FILE` / `SPEC_ROOT` overrides live here |
 
 ### Everything else
@@ -96,20 +108,24 @@ is not an instantiation; `examples/vendor-task-service` is.
 - `service.yaml` — manifest with `harness.mode` (greenfield / port / rewrite)
   and `harness.tier` (S / M / L), both consistency-checked.
 - `specification/` — `endpoints.yaml`, `integrations.yaml`, `nfr.yaml`,
-  `domain.md`, plus `README.md` carrying the id scheme and the `evidence` /
-  `status` rules.
+  `domain.md`. The id scheme and the `evidence` / `status` rules live in the
+  header comments of `endpoints.yaml`.
 - `gaps/open-questions.yaml` — the open-question register, treated as a
   deliverable; a question needs ≥2 options each with its consequence.
-- `decisions.md` + `decisions.yaml` — registry and machine index, id sets
-  cross-checked.
-- `state/` — the lock (`current-task.yaml`) and the ledger (`build-state.yaml`).
-- `prompts/` — `system.md` plus five role prompts.
+- `decisions.yaml` — the decision registry. One file, machine-readable; the
+  entry format is documented in its header comments.
+- `state/build-state.yaml` — the ledger and the one task in flight, in one
+  file. There is no lock: one person builds one service at a time.
+- `prompts/system.md` — the one shared prompt. Each role prompt lives inside
+  its agent file under `.claude/agents/`.
 - `.claude/` — five subagents, five slash commands, the deny rules.
-- `examples/vendor-task-service/` — 2 endpoints, 9 behaviours, 1 upstream,
-  5 approved cases, 1 deliberately open question, a clean Java sample under
+- `examples/vendor-task-service/` — 1 endpoint, 7 behaviours, 1 upstream,
+  3 approved cases, 1 deliberately open question, a clean Java sample under
   `target-sample/` so the code checks have something real to pass on.
 - `docs/design-notes.md` — why it is shaped this way; what was dropped from the
   migration-harness ancestor and why.
+- `docs/simplification-plan.md` — the 2026-11-06 grilling session: what was cut,
+  what was deliberately left alone, and why.
 
 ---
 
@@ -176,7 +192,9 @@ and checked for consistency but has no recorder behind it.
    instead of scanning the harness.
 5. **The decisions format example used a real id (`## PD-001`).**
    `harness.sh` read it out of the fenced code block and reported the two
-   registry files as disagreeing. Changed to `## PD-nnn`.
+   registry files as disagreeing. Changed to `## PD-nnn`. The drift check that
+   found it no longer exists — `decisions.md` and `decisions.yaml` are now one
+   file, so there is nothing left to drift.
 
 ---
 
@@ -187,7 +205,9 @@ and checked for consistency but has no recorder behind it.
    template itself.
 3. Run the four verification commands above.
 4. Read `examples/vendor-task-service/` — faster than the format documentation.
-5. Pick up the acceptance runner.
+5. Read `docs/simplification-plan.md` and answer its four open questions, or
+   note that you are deferring them.
+6. Pick up the acceptance runner.
 
 If anything in this file disagrees with what the commands actually print,
 **the commands are right and this file is stale.** Fix the file.

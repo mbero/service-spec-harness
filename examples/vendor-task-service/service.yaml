@@ -65,11 +65,11 @@ phases:
       - no_open_blocking_decisions
 
 agents:
-  spec_author:   { role: specification_author, prompt: prompts/system.md + prompts/spec.md,       writes_target_code: false }
-  orchestrator:  { role: build_orchestrator,   prompt: prompts/system.md + prompts/plan.md,       writes_target_code: false }
-  implementer:   { role: build_implementer,    prompt: prompts/system.md + prompts/implement.md }
-  reviewer:      { role: build_reviewer,       prompt: prompts/system.md + prompts/review.md,     read_only_except: [reports/reviews/] }
-  advisor:       { role: independent_advisor,  prompt: prompts/system.md + prompts/advisor.md,    read_only_except: [reports/reviews/] }
+  spec_author:   { role: specification_author, prompt: prompts/system.md + .claude/agents/spec-author.md,       writes_target_code: false }
+  orchestrator:  { role: build_orchestrator,   prompt: prompts/system.md + .claude/agents/build-orchestrator.md,       writes_target_code: false }
+  implementer:   { role: build_implementer,    prompt: prompts/system.md + .claude/agents/build-implementer.md }
+  reviewer:      { role: build_reviewer,       prompt: prompts/system.md + .claude/agents/build-reviewer.md,     read_only_except: [reports/reviews/] }
+  advisor:       { role: independent_advisor,  prompt: prompts/system.md + .claude/agents/independent-advisor.md,    read_only_except: [reports/reviews/] }
 
 validation:
   required:
@@ -92,5 +92,5 @@ artifacts:
   specification: specification/
   acceptance: acceptance/
   gaps: gaps/open-questions.yaml
-  decisions: decisions.md
+  decisions: decisions.yaml
   decisions_index: decisions.yaml

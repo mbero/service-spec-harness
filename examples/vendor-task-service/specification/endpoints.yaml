@@ -66,35 +66,12 @@ endpoints:
           still returned with 200 and the vendor object carries only `id` —
           `name` is absent, per GL-B01.
 
-  - id: E2
-    method: POST
-    path: /api/v1/tasks
-    summary: Creates a task
-    auth: bearer
-
-    behaviours:
-
-      - id: E2-B01
-        title: Valid payload creates the task and returns 201 with Location
-        status: agreed
-        evidence: "interview 2026-11-06, M.B."
-        observable: >
-          201, a Location header pointing at /api/v1/tasks/{id}, and the created
-          resource as the body.
-
-      - id: E2-B02
-        title: Blank title is rejected
-        status: agreed
-        evidence: "ADR-9"
-        observable: >
-          400 problem+json, title "Validation failed", and the body names the
-          field `title`. A title of spaces only is blank.
-
-      - id: E2-B03
-        title: Duplicate externalRef is rejected
+      - id: E1-B04
+        title: Repeated lookups reuse the vendor response
         status: open
         question: Q-001
         evidence: "interview 2026-11-06, M.B."
         observable: >
-          UNRESOLVED — 409 versus idempotent 200 is not decided. See Q-001.
+          UNRESOLVED — whether the vendor-service response is cached between
+          requests, and for how long, is not decided. See Q-001.
           No acceptance case may be written for this behaviour until it is.

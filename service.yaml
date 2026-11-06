@@ -96,7 +96,7 @@ constraints:
 # ---------------------------------------------------------------------------
 # Phases. tier S and M use the single phase `main` and ignore the rest.
 # tier L splits the work; an agent holds exactly ONE contract at a time, named
-# by state/current-task.yaml.
+# by the `current` section of state/build-state.yaml.
 # ---------------------------------------------------------------------------
 
 phases:
@@ -112,29 +112,29 @@ phases:
 agents:
   spec_author:
     role: specification_author
-    prompt: prompts/system.md + prompts/spec.md
-    writes: [specification/, acceptance/, gaps/, decisions.md]
+    prompt: prompts/system.md + .claude/agents/spec-author.md
+    writes: [specification/, acceptance/, gaps/, decisions.yaml]
     writes_target_code: false
 
   orchestrator:
     role: build_orchestrator
-    prompt: prompts/system.md + prompts/plan.md
-    writes: [reports/plan/, state/, decisions.md]
+    prompt: prompts/system.md + .claude/agents/build-orchestrator.md
+    writes: [reports/plan/, state/, decisions.yaml]
     writes_target_code: false
 
   implementer:
     role: build_implementer
-    prompt: prompts/system.md + prompts/implement.md
+    prompt: prompts/system.md + .claude/agents/build-implementer.md
     writes: [target code, target tests, state/, reports/validation/]
 
   reviewer:
     role: build_reviewer
-    prompt: prompts/system.md + prompts/review.md
+    prompt: prompts/system.md + .claude/agents/build-reviewer.md
     read_only_except: [reports/reviews/]
 
   advisor:
     role: independent_advisor
-    prompt: prompts/system.md + prompts/advisor.md
+    prompt: prompts/system.md + .claude/agents/independent-advisor.md
     read_only_except: [reports/reviews/]
 
 validation:
@@ -159,7 +159,7 @@ artifacts:
   specification: specification/
   acceptance: acceptance/
   gaps: gaps/open-questions.yaml
-  decisions: decisions.md
+  decisions: decisions.yaml
   decisions_index: decisions.yaml
   prompts: prompts/
   checks: checks/

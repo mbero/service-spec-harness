@@ -45,6 +45,79 @@ in place. That is correct. Verification runs against
 `examples/vendor-task-service`, which is a complete instantiation, and against
 the temporary copies `checks/selftest.sh` makes of it.
 
+## `reports/` — output, not input
+
+The directory is not tracked. An agent creates it on first write. Nothing in it
+is a source of truth: `specification/`, `acceptance/`, `decisions.yaml` and
+`state/` are.
+
+| Path | Written by | Holds |
+|---|---|---|
+| `reports/plan/` | the orchestrator | `implementation-plan.md`, the ordered `Sxx` steps |
+| `reports/reviews/` | the reviewer and the advisor | `Sxx.md`, `Sxx-advisor.md` — one pair per step |
+| `reports/validation/` | the implementer | check output worth keeping, measurements, probe results |
+
+Keep a review report after the finding is fixed. The record of *what was nearly
+shipped* is the most useful thing in that directory six weeks later.
+
+## `.claude/` — the multi-agent wiring
+
+`service.yaml` declares five agents. This directory is what makes them real.
+
+| | |
+|---|---|
+| `agents/` | five subagents, each carrying its own role prompt and a tool allowlist |
+| `commands/` | the slash commands that drive the loop |
+| `settings.json` | the path denials — the part that is actually enforced |
+
+## The agents
+
+Each agent file carries its own role prompt. `prompts/system.md` is the one
+shared prompt, and every agent reads it first.
+
+| Agent | Writes |
+|---|---|
+| `spec-author` | `specification/`, `acceptance/`, `gaps/`, `decisions.yaml` |
+| `build-orchestrator` | `reports/plan/`, `state/`, `decisions.yaml` |
+| `build-implementer` | the target code and its tests, `state/`, `reports/validation/` |
+| `build-reviewer` | `reports/reviews/Sxx.md` only |
+| `independent-advisor` | `reports/reviews/Sxx-advisor.md` only |
+
+The reviewer and the advisor have **no `Edit`**, deliberately. A reviewer that
+can fix what it finds ends up reviewing its own work, and the loop loses its
+only independent signal.
+
+`spec-author` and `build-implementer` are **never the same run**. The author
+writes the oracle; the implementer is denied write access to it. If one agent
+ever does both, this harness is decoration.
+
+## What is actually enforced
+
+Tool allowlists restrict *which tools*, never *which paths* — `Edit` reaches
+any file on disk. So the path rules live in `settings.json` `permissions.deny`:
+
+| Denied | Why |
+|---|---|
+| `acceptance/**` | the oracle. An implementer that can edit a case can make any step pass. |
+| `examples/**` | the selftest fixture. Editing it to make `checks/selftest.sh` green removes the only proof the checks can fail. |
+
+`checks/harness.sh` re-reads this file and fails if either rule is missing. A
+deny rule nobody verifies is a deny rule that quietly gets deleted.
+
+## The commands
+
+| Command | Does |
+|---|---|
+| `/spec-status` | specification coverage, open questions, blocking decisions, the lock |
+| `/spec-next` | resolves the next step, refuses if blocked, claims the lock, delegates to the implementer |
+| `/spec-review` | reviewer, then advisor — independently, in that order |
+| `/spec-check` | runs `checks/all.sh` and explains which failures belong to the step in flight |
+| `/spec-elicit` | runs the specification interview and writes the gaps it could not close |
+
+`/spec-status` is a safe first command in any session: read-only, and it
+surfaces the two things that invalidate everything downstream — an unapproved
+oracle and a held lock.
+
 ## When you change the format
 
 A format change usually touches four files at once. Change them together:
@@ -52,9 +125,9 @@ A format change usually touches four files at once. Change them together:
 | Change | Also update |
 |---|---|
 | a field in a case | `acceptance/README.md`, `checks/spec-completeness.sh`, the example cases, `checks/selftest.sh` |
-| a field in `specification/*.yaml` | `specification/README.md`, `checks/spec-completeness.sh`, the example, `prompts/spec.md` |
+| a field in `specification/*.yaml` | the header comments in `specification/endpoints.yaml`, `checks/spec-completeness.sh`, the example, `.claude/agents/spec-author.md` |
 | an architecture rule | `architecture.yaml` only — `checks/architecture.sh` reads it, nothing is hardcoded |
 | a manifest field | `service.yaml`, `checks/harness.sh`, the example manifest |
 
-Then run `checks/selftest.sh`. If it still passes 27/27 without you having
+Then run `checks/selftest.sh`. If it still passes 26/26 without you having
 touched it, ask whether your change was actually covered.

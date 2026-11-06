@@ -32,7 +32,7 @@ principles:
   - id: explicit-decisions
     name: Explicit decisions
     description: >
-      Anything this contract does not cover requires a PD entry in decisions.md
+      Anything this contract does not cover requires a PD entry in decisions.yaml
       before implementation, not a plausible guess.
 
 # ---------------------------------------------------------------------------
@@ -166,6 +166,6 @@ agent-authority:
     - anything touching authentication, authorisation or secrets
 
   red_handling: >
-    STOP. Write the question into decisions.md as a new PD entry, add it to
+    STOP. Write the question into decisions.yaml as a new PD entry, add it to
     gaps/open-questions.yaml if it is a specification gap, and report. Do not
     pick the plausible option and carry on.

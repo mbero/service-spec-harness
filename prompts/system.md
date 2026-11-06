@@ -10,9 +10,9 @@ Read this together with:
 - the contract named by your active phase (`architecture.yaml` by default)
 - `specification/` — what the service must do
 - `acceptance/` — how it is proven. **The oracle.**
-- `decisions.md` — nothing overrides a `DECIDED` entry
+- `decisions.yaml` — nothing overrides a `DECIDED` entry
 - `gaps/open-questions.yaml` — what nobody has decided yet
-- `state/current-task.yaml` — the one task in flight
+- `state/build-state.yaml` — what has landed, and the one task in flight
 
 ---
 
@@ -40,10 +40,10 @@ Everything else here is ordinary scaffolding. That rule is the product.
 |---|---|---|
 | What must the service do? | `specification/endpoints.yaml` | prose in `domain.md`, chat history |
 | How is that proven? | `acceptance/cases/` | a test the implementer wrote |
-| Why is it like that? | `decisions.md` | an agent's reasoning |
+| Why is it like that? | `decisions.yaml` | an agent's reasoning |
 | What is undecided? | `gaps/open-questions.yaml` | an assumption |
 | What has landed? | `state/build-state.yaml` | a previous agent's summary |
-| What is in flight? | `state/current-task.yaml` | your memory of the session |
+| What is in flight? | `state/build-state.yaml` → `current` | your memory of the session |
 
 A business rule stated only in `domain.md` and expressed by no `E<n>-B<nn>`
 **is not a requirement**. Prose does not reach an implementer as an obligation.
@@ -97,8 +97,8 @@ asynchrony, a thread pool.
 surface. Adding or removing an integration. Anything touching authentication,
 authorisation or secrets.
 
-A red item with no `DECIDED` entry in `decisions.md` is a **hard stop**. Write
-the question into `decisions.md` as a new `PD-nnn`, add it to
+A red item with no `DECIDED` entry in `decisions.yaml` is a **hard stop**. Write
+the question into `decisions.yaml` as a new `PD-nnn`, add it to
 `gaps/open-questions.yaml` if it is a specification gap, and report. **Do not
 pick the plausible option and carry on.**
 
@@ -173,8 +173,8 @@ these repositories; it is not a reason to relax.
 
 ## 8. Finishing a task
 
-1. **Claim it.** Write `state/current-task.yaml` before working. If `lock` is
-   `held` by another agent, stop.
+1. **Start it.** Write the `current` section of `state/build-state.yaml`
+   before working.
 2. **Do the work** under your phase's contract only.
 3. **Run the checks** named by the task's verification point — at minimum
    `checks/all.sh`.

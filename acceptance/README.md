@@ -1,5 +1,27 @@
 # `acceptance/` — the oracle
 
+## The three directories
+
+The spec-author creates each one on first write. They are empty in the
+template, so git does not carry them.
+
+| Path | Holds |
+|---|---|
+| `acceptance/cases/` | one file per case, named exactly `<id>.yaml`. Format below. |
+| `acceptance/expected/` | expected response bodies, one `.json` per case that uses `then.body.json_exact` |
+| `acceptance/fixtures/` | upstream response bodies, shared between cases via `given.upstream[].respond.body_file` |
+
+**`expected/` is byte-for-byte**, field order included. Do not reformat a file
+there; a formatter run is a silent contract change.
+
+**`fixtures/` holds no secret and no real customer record.** A fixture that
+needs a token uses the placeholder `{{token}}`, which the runner substitutes
+per run.
+
+A worked set is in `examples/vendor-task-service/acceptance/`.
+`checks/selftest.sh` mutates that set to prove every rule in
+`checks/spec-completeness.sh` can actually fail.
+
 In a migration harness the oracle is a recording: you run the old service and
 keep what it said. **There is nothing to record here.** So the oracle is
 *authored*, and that changes one thing fundamentally:
@@ -16,7 +38,8 @@ It is enforced in three places, deliberately overlapping:
    in the project.
 2. `checks/harness.sh` verifies rule 1 is still present and still spelled
    correctly — a deny rule nobody checks is a deny rule that gets edited away.
-3. `prompts/implement.md` states it, and `prompts/review.md` makes "did this
+3. `.claude/agents/build-implementer.md` states it, and
+   `.claude/agents/build-reviewer.md` makes "did this
    step touch `acceptance/`?" a mandatory reject condition.
 
 Without this rule an agent writes the code, writes the test that the code
