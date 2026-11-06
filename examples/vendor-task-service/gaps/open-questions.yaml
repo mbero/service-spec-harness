@@ -1,0 +1,26 @@
+version: 1
+
+questions:
+
+  - id: Q-001
+    status: open
+    raised_on: "2026-11-06"
+    raised_by: spec-author
+    blocks: [E2-B03]
+    question: >
+      POST /api/v1/tasks with an externalRef that already exists — 409 Conflict,
+      or idempotent 200 returning the existing task?
+    why_it_matters: >
+      The caller retries on timeout. Under 409 every retry after a successful
+      but unacknowledged create surfaces an error the caller cannot act on.
+    options:
+      - id: a
+        option: 409 Conflict
+        consequence: Simple to implement; pushes retry handling onto the caller.
+      - id: b
+        option: Idempotent 200 with the existing task
+        consequence: >
+          Requires externalRef to be unique per vendor and makes the endpoint
+          safe to retry; needs a decision on what happens when the payload
+          differs from the stored task.
+    asked_of: product owner

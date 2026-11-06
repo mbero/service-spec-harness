@@ -1,0 +1,12 @@
+# Machine-readable index of decisions.md.
+#
+# decisions.md is authoritative for the prose. This file carries only what
+# tooling needs: checks use `blocking` to refuse work, and spec-completeness
+# uses the id set to resolve `evidence: "PD-nnn"`.
+#
+# checks/harness.sh verifies that the id sets match.
+
+meta:
+  version: 1
+
+decisions: []

@@ -1,0 +1,33 @@
+# Non-functional requirements.
+#
+# Only entries that can FAIL belong here. "The service should be performant"
+# cannot fail, so it is not a requirement — it is a mood.
+
+version: 1
+
+requirements:
+
+  - id: N1
+    category: performance
+    status: proposed
+    evidence: <<REQUIRED>>
+    requirement: >
+      <<REQUIRED — with a number and a percentile, e.g. p99 under 400 ms for E1
+      measured at the service boundary with upstreams stubbed.>>
+    verified_by: <<REQUIRED — which acceptance case, load test or check proves it>>
+
+  - id: N2
+    category: observability
+    status: proposed
+    evidence: <<REQUIRED>>
+    requirement: >
+      <<REQUIRED — name the metrics and their type and tags, not "we have metrics".>>
+    verified_by: <<REQUIRED>>
+
+  - id: N3
+    category: security
+    status: proposed
+    evidence: <<REQUIRED>>
+    requirement: >
+      <<REQUIRED>>
+    verified_by: <<REQUIRED>>

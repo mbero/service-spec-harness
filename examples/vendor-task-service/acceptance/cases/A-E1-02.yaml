@@ -1,0 +1,32 @@
+id: A-E1-02
+title: Unknown task returns a problem+json 404 naming the id
+endpoint: E1
+proves: [E1-B02, GL-B03]
+status: approved
+approved:
+  by: Marcin Berendt
+  date: "2026-11-06"
+
+given:
+  upstream: []
+  state: []
+
+when:
+  method: GET
+  path: /api/v1/tasks/999
+  headers:
+    Authorization: "Bearer {{token}}"
+  query: {}
+  body: null
+
+then:
+  status: 404
+  headers:
+    Content-Type: { equals: "application/problem+json" }
+    X-TRACE-ID: { present: true }
+  body:
+    json_contains:
+      title: "Task not found"
+      status: 404
+      detail: "No task with id 999"
+  absent_fields: []

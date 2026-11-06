@@ -1,0 +1,12 @@
+[project]
+name = "service-spec-harness"
+version = "0.1.0"
+description = "Spec-driven harness for building a microservice with AI agents: specification, acceptance oracle, checks"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6",          # manifest, specification, acceptance cases, decisions
+]
+
+[tool.uv]
+# Scripts, not a package: nothing here is installed or imported from outside.
+package = false

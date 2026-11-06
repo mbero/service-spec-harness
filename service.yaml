@@ -1,0 +1,167 @@
+# Service manifest — the one file every agent and every check reads first.
+#
+# This is the template copy. Instantiating the harness means replacing every
+# <<REQUIRED — ...>> marker with a real value. `checks/harness.sh` fails while
+# any marker remains, so an unfilled manifest can never report a green run.
+#
+# Markers are deliberate. A TODO comment rots silently; a marker is checked.
+
+harness:
+  version: 1
+
+  # greenfield — no implementation exists. The specification is the only oracle.
+  # port      — a working service exists and is the oracle (record, then replay).
+  # rewrite   — a working service exists but its behaviour is deliberately changed;
+  #             the frozen part is recorded, the changed part is specified.
+  mode: greenfield
+
+  # S — one contract, no phases, no advisor. Up to ~5 endpoints, no persistence.
+  # M — one contract, full review loop (reviewer + advisor). The default.
+  # L — phased contracts (A then B), full review loop, decision gating.
+  tier: M
+
+project:
+  name: <<REQUIRED — service name, e.g. vendor-task-service>>
+  description: >
+    <<REQUIRED — one paragraph. What the service is for, who calls it, what it
+    is NOT responsible for.>>
+
+  jira:
+    parent: <<REQUIRED — the epic or parent issue key>>
+    implementation: <<REQUIRED — the issue the agents deliver against>>
+
+repositories:
+
+  # Where the service code is written.
+  target:
+    path: <<REQUIRED — absolute path to the service repository>>
+    branch: <<REQUIRED — the one branch all work lands on>>
+    read_only: false
+
+  # This harness.
+  harness:
+    path: .
+    branch: <<REQUIRED — the harness branch>>
+
+  # port / rewrite mode only. The behavioural oracle. Never writable.
+  # Delete this block in greenfield mode; checks/harness.sh checks the pairing.
+  reference:
+    path: null
+    commit: null
+    read_only: true
+
+commit_messages:
+  convention: conventional-commits
+  subject: "<type>: [<JIRA-KEY>] <subject>"
+  jira_key:
+    target: <<REQUIRED — issue key used in the service repository>>
+    harness: <<REQUIRED — issue key used in this repository>>
+  types: [feat, fix, refactor]
+  rules:
+    - The Jira key is REQUIRED, in square brackets, immediately after the type.
+    - Subject is one line, no trailing period.
+    - >
+      No agent ever runs git commit, git push, git checkout -b or gh pr create.
+      The operator commits. See prompts/system.md.
+
+# ---------------------------------------------------------------------------
+# Technology constraints. checks/forbidden-tech.sh reads this block and nothing
+# else — adding a banned library here is the whole act of banning it.
+# ---------------------------------------------------------------------------
+
+constraints:
+
+  required:
+    language: Java
+    language_version: "25"
+    framework: Spring MVC
+    build: maven
+
+  # Each entry becomes a grep. `reason` is printed with the violation, so it
+  # must say why, not repeat what.
+  forbidden:
+    - pattern: 'spring-boot-starter-webflux|spring-webflux|reactor-core'
+      files: ['pom.xml', '*.gradle', '*.gradle.kts']
+      reason: "the service is blocking Spring MVC; the reactive stack is not on the classpath"
+    - pattern: '\bMono<|\bFlux<|import\s+reactor\.'
+      files: ['*.java']
+      reason: "reactive types in a blocking service"
+    - pattern: 'org\.jetbrains\.kotlin|kotlin-stdlib'
+      files: ['pom.xml', '*.gradle', '*.gradle.kts']
+      reason: "Java only"
+    - pattern: '[^a-zA-Z]WebClient\b'
+      files: ['*.java']
+      reason: "WebClient pulls the reactive stack back in; use RestClient"
+
+# ---------------------------------------------------------------------------
+# Phases. tier S and M use the single phase `main` and ignore the rest.
+# tier L splits the work; an agent holds exactly ONE contract at a time, named
+# by state/current-task.yaml.
+# ---------------------------------------------------------------------------
+
+phases:
+  - id: main
+    contract: architecture.yaml
+    description: >
+      The specified service. Every acceptance case in acceptance/cases must pass.
+    exit_criteria:
+      - acceptance_100pct
+      - checks_all_green
+      - no_open_blocking_decisions
+
+agents:
+  spec_author:
+    role: specification_author
+    prompt: prompts/system.md + prompts/spec.md
+    writes: [specification/, acceptance/, gaps/, decisions.md]
+    writes_target_code: false
+
+  orchestrator:
+    role: build_orchestrator
+    prompt: prompts/system.md + prompts/plan.md
+    writes: [reports/plan/, state/, decisions.md]
+    writes_target_code: false
+
+  implementer:
+    role: build_implementer
+    prompt: prompts/system.md + prompts/implement.md
+    writes: [target code, target tests, state/, reports/validation/]
+
+  reviewer:
+    role: build_reviewer
+    prompt: prompts/system.md + prompts/review.md
+    read_only_except: [reports/reviews/]
+
+  advisor:
+    role: independent_advisor
+    prompt: prompts/system.md + prompts/advisor.md
+    read_only_except: [reports/reviews/]
+
+validation:
+  required:
+    - spec_completeness
+    - compilation
+    - unit_tests
+    - acceptance_cases
+    - architecture_checks
+    - forbidden_technology_checks
+    - advisor_review          # tier M and L only
+
+  stop_on:
+    - unresolved_open_question
+    - unresolved_blocking_decision
+    - critical_advisor_finding
+    - failed_required_validation
+
+artifacts:
+  manifest: service.yaml
+  architecture: architecture.yaml
+  specification: specification/
+  acceptance: acceptance/
+  gaps: gaps/open-questions.yaml
+  decisions: decisions.md
+  decisions_index: decisions.yaml
+  prompts: prompts/
+  checks: checks/
+  state: state/
+  reports: reports/

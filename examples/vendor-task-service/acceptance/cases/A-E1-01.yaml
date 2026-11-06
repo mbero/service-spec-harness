@@ -1,0 +1,37 @@
+id: A-E1-01
+title: Known task is returned with its vendor name resolved
+endpoint: E1
+proves: [E1-B01, GL-B01, GL-B02]
+status: approved
+approved:
+  by: Marcin Berendt
+  date: "2026-11-06"
+
+given:
+  upstream:
+    - integration: I1
+      request:
+        method: GET
+        path: /api/v1/vendors/42
+      respond:
+        status: 200
+        body_file: fixtures/vendor-42.json
+  state:
+    - entity: task
+      values: { id: 7, title: "Replace brake pads", status: OPEN, vendorId: 42 }
+
+when:
+  method: GET
+  path: /api/v1/tasks/7
+  headers:
+    Authorization: "Bearer {{token}}"
+  query: {}
+  body: null
+
+then:
+  status: 200
+  headers:
+    X-TRACE-ID: { present: true }
+  body:
+    json_exact: expected/A-E1-01.json
+  absent_fields: [vendor.status]

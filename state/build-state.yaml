@@ -1,0 +1,43 @@
+# Build state — the ledger.
+#
+# Authoritative record of what has actually landed. Overrides any other view of
+# what is done, including a confident agent's summary of its own run.
+#
+# Updated by the orchestrator after each step, and by nobody else.
+
+meta:
+  version: 1
+  last_updated: null
+  last_updated_note: >
+    Replace with what the session actually did, not what it intended. A note
+    that says "implemented E1" when the step was reverted is how the next
+    session loses an afternoon.
+
+specification:
+  status: not_started        # not_started | drafting | awaiting_approval | agreed
+  endpoints_agreed: 0
+  behaviours_agreed: 0
+  cases_approved: 0
+  open_questions: 0
+
+plan:
+  file: reports/plan/implementation-plan.md
+  steps_total: 0
+  steps_done: 0
+
+steps: []
+  # - id: S01
+  #   title: Project skeleton and health endpoint
+  #   status: done            # todo | in_progress | done | reverted
+  #   landed_on: "2026-11-06"
+  #   cases_passing: [A-E1-01]
+  #   review: reports/reviews/S01.md
+  #   advisor: reports/reviews/S01-advisor.md
+  #   note: >
+  #     What a reader six weeks from now needs and cannot reconstruct from the
+  #     diff. Empty is better than a restatement of the title.
+
+blocked_by:
+  decisions: []
+  questions: []
+  external: []

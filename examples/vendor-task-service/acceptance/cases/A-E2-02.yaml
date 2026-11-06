@@ -1,0 +1,33 @@
+id: A-E2-02
+title: A title of spaces only is rejected as blank
+endpoint: E2
+proves: [E2-B02, GL-B03]
+status: approved
+approved:
+  by: Marcin Berendt
+  date: "2026-11-06"
+
+given:
+  upstream: []
+  state: []
+
+when:
+  method: POST
+  path: /api/v1/tasks
+  headers:
+    Authorization: "Bearer {{token}}"
+    Content-Type: "application/json"
+  query: {}
+  body:
+    title: "   "
+    vendorId: 42
+
+then:
+  status: 400
+  headers:
+    Content-Type: { equals: "application/problem+json" }
+  body:
+    json_contains:
+      title: "Validation failed"
+      status: 400
+  absent_fields: []

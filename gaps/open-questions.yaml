@@ -1,0 +1,32 @@
+# Open questions — what the specification does not yet answer.
+#
+# This file is a DELIVERABLE, not a failure report. In greenfield work the
+# single most valuable thing a harness produces early is an exact list of what
+# nobody has decided yet — written precisely enough that a product owner can
+# answer it in one sitting.
+#
+# A question belongs here when an agent would otherwise have to guess. A
+# question that an agent can answer from the specification does not.
+#
+# Format:
+#
+#   - id: Q-001                 # Q-nnn, stable, never renumbered
+#     status: open              # open | answered | withdrawn
+#     raised_on: "2026-11-06"
+#     raised_by: spec-author
+#     blocks: [E2-B03]          # behaviour ids that stay `status: open`
+#     question: >               # one question, answerable, not a topic
+#     why_it_matters: >         # the consequence of guessing wrong
+#     options:                  # at least two, each with its consequence
+#       - id: a
+#         option: ...
+#         consequence: ...
+#     asked_of: product owner
+#     answer: null              # filled when status becomes answered
+#
+# checks/spec-completeness.sh enforces: two options minimum, every option has a
+# consequence, and `blocks` stays consistent with the behaviour's own status.
+
+version: 1
+
+questions: []

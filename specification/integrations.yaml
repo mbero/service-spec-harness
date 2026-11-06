@@ -1,0 +1,35 @@
+# Upstream integrations.
+#
+# Every entry answers the four questions an implementer otherwise guesses:
+# how long do we wait, how often do we retry, what does the caller see when it
+# fails, and is the call allowed to be skipped.
+
+version: 1
+
+integrations:
+
+  - id: I1
+    name: <<REQUIRED — upstream service name>>
+    status: proposed
+    evidence: <<REQUIRED>>
+    transport: <<REQUIRED — http | kafka | jdbc | grpc>>
+    base_url_property: <<REQUIRED — the configuration key, never the value>>
+    auth: <<REQUIRED — none | bearer passthrough | service token | apikey>>
+
+    timeouts:
+      connect_ms: <<REQUIRED>>
+      read_ms: <<REQUIRED>>
+
+    retry:
+      attempts: <<REQUIRED — total attempts including the first>>
+      on: <<REQUIRED — which responses, e.g. [5xx, connect-timeout]>>
+      backoff_ms: <<REQUIRED>>
+
+    on_failure:
+      behaviour: <<REQUIRED — fail-request | fallback | degrade>>
+      observable: >
+        <<REQUIRED — what the CALLER of our service sees when this upstream is
+        down. This is the field teams forget, and it is the one that shows up
+        in production.>>
+
+    used_by: [<<REQUIRED — endpoint ids, e.g. E1, E3>>]

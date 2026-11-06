@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(./acceptance/**)",
+      "Edit(./acceptance/**)",
+      "Write(./examples/**)",
+      "Edit(./examples/**)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git switch -c:*)"
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#
+# The harness's one way to run Python. Every script calls this, never
+# python3 directly, so the interpreter and its dependencies are the same
+# everywhere.
+#
+#   PYTHON set   that interpreter, as given ("py -3" works - it is split)
+#   uv on PATH   uv run in this project's locked environment
+#                (pyproject.toml + uv.lock); --locked refuses a lock that no
+#                longer matches pyproject.toml rather than quietly re-resolving
+#   otherwise    python3, which then needs pyyaml installed
+#
+# Arguments and stdin pass through untouched: `bin/py - <<'EOF'` works.
+#
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [ -n "${PYTHON:-}" ]; then
+  # shellcheck disable=SC2086  # deliberate: PYTHON may carry arguments
+  exec $PYTHON "$@"
+fi
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --project "$ROOT" --locked --quiet python "$@"
+fi
+exec python3 "$@"

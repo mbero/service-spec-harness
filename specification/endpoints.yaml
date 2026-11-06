@@ -1,0 +1,57 @@
+# Observable contract, per operation.
+#
+# Template copy. Replace the <<REQUIRED>> markers; a worked example is in
+# examples/vendor-task-service/specification/endpoints.yaml.
+#
+# Read specification/README.md for the id scheme and for what `evidence` and
+# `status` mean. checks/spec-completeness.sh enforces both.
+
+version: 1
+service: <<REQUIRED — service name, must match service.yaml project.name>>
+consumers:
+  - <<REQUIRED — who calls this service. "unknown" is an open question, not an answer.>>
+
+# ---------------------------------------------------------------------------
+# Applies to every operation.
+# ---------------------------------------------------------------------------
+
+global:
+
+  - id: GL-B01
+    title: JSON serialization settings
+    status: proposed
+    evidence: <<REQUIRED>>
+    observable: >
+      <<REQUIRED — state it as something a caller can see on the wire. "Jackson
+      is configured with NON_EMPTY" is not observable; "a null, an empty string
+      and an empty collection are omitted from the response body entirely" is.>>
+
+  - id: GL-B02
+    title: Correlation header
+    status: proposed
+    evidence: <<REQUIRED>>
+    observable: >
+      <<REQUIRED>>
+
+# ---------------------------------------------------------------------------
+# Operations.
+# ---------------------------------------------------------------------------
+
+endpoints:
+
+  - id: E1
+    method: <<REQUIRED — GET | POST | PUT | PATCH | DELETE>>
+    path: <<REQUIRED — e.g. /api/v1/tasks/{taskId}>>
+    summary: <<REQUIRED — one line>>
+    auth: <<REQUIRED — none | bearer | mtls — and which scopes>>
+
+    behaviours:
+
+      - id: E1-B01
+        title: <<REQUIRED — one line>>
+        status: proposed
+        evidence: <<REQUIRED>>
+        observable: >
+          <<REQUIRED — the externally visible outcome, including status code and
+          the shape of the body.>>
+
