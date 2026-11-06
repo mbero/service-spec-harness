@@ -1,0 +1,9 @@
+{
+  "id": 7,
+  "title": "Replace brake pads",
+  "status": "OPEN",
+  "partner": {
+    "id": 42,
+    "name": "ACME Parts"
+  }
+}

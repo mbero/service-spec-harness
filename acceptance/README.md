@@ -18,7 +18,7 @@ there; a formatter run is a silent contract change.
 needs a token uses the placeholder `{{token}}`, which the runner substitutes
 per run.
 
-A worked set is in `examples/vendor-task-service/acceptance/`.
+A worked set is in `examples/partner-task-service/acceptance/`.
 `checks/selftest.sh` mutates that set to prove every rule in
 `checks/spec-completeness.sh` can actually fail.
 
@@ -65,7 +65,7 @@ reports unapproved cases; `checks/all.sh` fails on them once the plan starts.
 
 ```yaml
 id: A-E1-01                       # must match the filename
-title: Returns the task with its vendor name resolved
+title: Returns the task with its partner name resolved
 endpoint: E1                      # must exist in specification/endpoints.yaml
 proves: [E1-B01, E1-B03, GL-B02]  # every id must exist. This is the link that
                                   # makes a behaviour verifiable.
@@ -79,10 +79,10 @@ given:
     - integration: I1             # must exist in specification/integrations.yaml
       request:
         method: GET
-        path: /api/v1/vendors/42
+        path: /api/v1/partners/42
       respond:
         status: 200
-        body_file: fixtures/vendor-42.json
+        body_file: fixtures/partner-42.json
   state: []                       # rows/messages to seed, [] when stateless
 
 when:
@@ -100,8 +100,8 @@ then:
   body:
     json_exact: expected/A-E1-01.json
     # or, instead of json_exact:
-    # json_contains: { id: 7, vendor: { name: "ACME" } }
-  absent_fields: [vendor.address]   # absence is a contract. Assert it.
+    # json_contains: { id: 7, partner: { name: "ACME" } }
+  absent_fields: [partner.address]   # absence is a contract. Assert it.
 ```
 
 ### `then.body` — pick exactly one

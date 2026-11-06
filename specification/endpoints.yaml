@@ -78,7 +78,7 @@
 # Observable contract, per operation.
 #
 # Template copy. Replace the <<REQUIRED>> markers; a worked example is in
-# examples/vendor-task-service/specification/endpoints.yaml.
+# examples/partner-task-service/specification/endpoints.yaml.
 #
 # The id scheme, and what `evidence` and `status` mean, are documented in the
 # header comments at the top of this file. checks/spec-completeness.sh

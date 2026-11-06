@@ -139,7 +139,7 @@ consequence of each, or it does not count as a question.
 | `prompts/system.md` | the shared system prompt; each role prompt lives inside its agent file |
 | `state/build-state.yaml` | the ledger: what has landed, and the one task in flight |
 | `.claude/` | five subagents, five slash commands, the deny rules |
-| `examples/vendor-task-service/` | a complete worked instantiation — and the selftest fixture |
+| `examples/partner-task-service/` | a complete worked instantiation — and the selftest fixture |
 | `docs/design-notes.md` | why it is shaped this way, and what was deliberately dropped |
 
 ---
@@ -149,13 +149,13 @@ consequence of each, or it does not count as a question.
 ```sh
 uv sync                                          # once per clone (pyyaml on python3 also works)
 
-checks/selftest.sh                               # 27 cases — the proof the gates are real
-checks/spec-completeness.sh examples/vendor-task-service
+checks/selftest.sh                               # 26 cases — the proof the gates are real
+checks/spec-completeness.sh examples/partner-task-service
 checks/all.sh                                    # see below for the env vars
 ```
 
-`examples/vendor-task-service` is a small but complete instantiation: two
-endpoints, nine behaviours, one upstream, five approved cases, one deliberately
+`examples/partner-task-service` is a small but complete instantiation: one
+endpoint, seven behaviours, one upstream, three approved cases, one deliberately
 open question, and a clean Java sample for the code checks to pass on. Reading
 it is faster than reading the format documentation.
 

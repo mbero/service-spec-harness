@@ -57,7 +57,7 @@ checks/selftest.sh
 #    → PASSED  26 selftest case(s): every check has been observed failing for its own reason
 
 # 2. The worked example is a valid, complete instantiation
-E=examples/vendor-task-service
+E=examples/partner-task-service
 SPEC_ROOT=$E MANIFEST_FILE=$E/service.yaml ARCH_FILE=$E/architecture.yaml \
   TARGET=$E/target-sample checks/all.sh
 #    → PASSED    [all] every stage green
@@ -74,7 +74,7 @@ grep -rniE '<org>|<product>|<TICKET-PREFIX>' . --exclude-dir=.git --exclude-dir=
 
 Point 3 is **expected and correct**. The `<<REQUIRED — …>>` markers are what
 make an unfilled field fail a check instead of rotting as a `TODO`. The template
-is not an instantiation; `examples/vendor-task-service` is.
+is not an instantiation; `examples/partner-task-service` is.
 
 ---
 
@@ -119,7 +119,7 @@ is not an instantiation; `examples/vendor-task-service` is.
 - `prompts/system.md` — the one shared prompt. Each role prompt lives inside
   its agent file under `.claude/agents/`.
 - `.claude/` — five subagents, five slash commands, the deny rules.
-- `examples/vendor-task-service/` — 1 endpoint, 7 behaviours, 1 upstream,
+- `examples/partner-task-service/` — 1 endpoint, 7 behaviours, 1 upstream,
   3 approved cases, 1 deliberately open question, a clean Java sample under
   `target-sample/` so the code checks have something real to pass on.
 - `docs/design-notes.md` — why it is shaped this way; what was dropped from the
@@ -172,7 +172,7 @@ and checked for consistency but has no recorder behind it.
 | Architecture rules live only in `architecture.yaml` | the ancestor kept them in a contract *and* reimplemented them in bash; two copies, both edited |
 | The worked example doubles as the selftest fixture | the example stays honest because breaking it breaks the test suite |
 | The selftest asserts the **message**, not just exit 1 | a check failing for an unrelated reason is not evidence |
-| No company-specific naming anywhere | explicit user instruction, 2026-11-06. Sample package is `com.example.vendortask` |
+| No company-specific naming anywhere | explicit user instruction, 2026-11-06. Sample package is `com.example.partnertask` |
 
 ---
 
@@ -204,7 +204,7 @@ and checked for consistency but has no recorder behind it.
 2. Read `AGENTS.md` — the rules that are not negotiable when changing the
    template itself.
 3. Run the four verification commands above.
-4. Read `examples/vendor-task-service/` — faster than the format documentation.
+4. Read `examples/partner-task-service/` — faster than the format documentation.
 5. Read `docs/simplification-plan.md` and answer its four open questions, or
    note that you are deferring them.
 6. Pick up the acceptance runner.

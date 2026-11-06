@@ -1,0 +1,171 @@
+# Architecture contract — the layer boundaries the service must obey.
+#
+# Unlike prose architecture documents, every rule below is EXECUTED.
+# checks/architecture.sh reads this file and nothing else: there is no second
+# copy of these rules in bash, so they cannot drift apart.
+#
+# The layout is hexagonal: ports and adapters around a dependency-free domain.
+# Normally the only line a new service edits is `base`. Think twice before
+# changing anything else — the value of a shared layout is that every service
+# in the estate is shaped the same way, and a one-off is worth less than it
+# looks.
+
+target:
+  language: { name: Java, version: "25" }
+  framework: { name: Spring MVC }
+  runtime:   { reactive: false }
+
+principles:
+
+  - id: spec-is-the-contract
+    name: The specification is the contract
+    description: >
+      An agent implements what specification/ states and what acceptance/
+      proves. Behaviour that neither names is not "obvious" — it is an open
+      question, and it goes to gaps/open-questions.yaml.
+
+  - id: minimal-change
+    name: No unrelated work
+    description: >
+      No refactoring, redesign or optimisation outside the step in flight.
+
+  - id: explicit-decisions
+    name: Explicit decisions
+    description: >
+      Anything this contract does not cover requires a PD entry in decisions.yaml
+      before implementation, not a plausible guess.
+
+# ---------------------------------------------------------------------------
+# Package layout. `base` is the only line a new service normally edits.
+# ---------------------------------------------------------------------------
+
+package-layout:
+
+  base: com.example.partnertask
+
+  layers:
+
+    api:
+      packages: [adapter.in.web]
+      responsibility:
+        - HTTP endpoints, request mapping and validation
+        - response mapping and HTTP error rendering
+
+    application:
+      packages: [application]
+      responsibility:
+        - use-case orchestration
+        - transaction boundaries
+
+    domain:
+      packages: [domain.model, domain.service, domain.port.in, domain.port.out]
+      responsibility:
+        - business rules and domain models
+        - the ports every adapter plugs into
+
+    infrastructure:
+      packages:
+        - adapter.out.external
+        - adapter.out.persistence
+        - adapter.out.property
+        - infrastructure.config
+        - infrastructure.http
+        - infrastructure.web
+        - infrastructure.metrics
+        - infrastructure.aspect
+        - infrastructure.exception
+        - infrastructure.time
+      responsibility:
+        - external systems, persistence, messaging, configuration
+
+# ---------------------------------------------------------------------------
+# Import rules — executed by checks/architecture.sh.
+#
+#   in_package        path fragment a file must contain for the rule to apply
+#   forbidden_imports list of { pattern, reason }; `pattern` is an ERE matched
+#                     against the import statement
+#   severity          violation (fails the check) | note (reported only)
+#
+# Every rule needs an id. reports/reviews/ quote them.
+# ---------------------------------------------------------------------------
+
+import-rules:
+
+  - id: AR-01
+    in_package: /domain/
+    severity: violation
+    forbidden_imports:
+      - pattern: '\.adapter\.'
+        reason: "domain is the core — it depends on nothing"
+      - pattern: '\.application\.'
+        reason: "domain must not know its callers"
+      - pattern: '\.infrastructure\.'
+        reason: "domain must not know how it is wired"
+
+  - id: AR-02
+    in_package: /domain/
+    severity: violation
+    forbidden_imports:
+      - pattern: 'org\.springframework\.web'
+        reason: "HTTP is an adapter concern; a domain type must be callable without a servlet"
+      - pattern: '(jakarta|javax)\.persistence'
+        reason: "persistence mapping belongs in adapter.out.persistence"
+
+  - id: AR-03
+    in_package: /adapter/in/
+    severity: violation
+    forbidden_imports:
+      - pattern: '\.adapter\.out\.'
+        reason: "an inbound adapter must not reach an outbound one; go through domain.port.in"
+
+  - id: AR-04
+    in_package: /adapter/
+    severity: violation
+    forbidden_imports:
+      - pattern: '\.application\.'
+        reason: "adapters depend on ports, not on use-case classes"
+
+  - id: AR-05
+    in_package: /application/
+    severity: violation
+    forbidden_imports:
+      - pattern: '\.adapter\.'
+        reason: "the use case owns the port; the adapter implements it"
+
+# Rules deliberately NOT enforced, and why. An entry here is a decision, not an
+# omission — a reviewer who proposes enforcing one must argue against this note.
+not-enforced:
+  - rule: application -> infrastructure
+    why: >
+      Common enough in practice that enforcing it would force a port for every
+      piece of technical plumbing. Relax this only with a decision entry, not
+      because a step is inconvenient.
+
+# ---------------------------------------------------------------------------
+# Authority — what an agent may do without asking. prompts/system.md §4 is the
+# human-readable half; this is what a review quotes.
+# ---------------------------------------------------------------------------
+
+agent-authority:
+
+  green:
+    - implementing a step whose acceptance cases already exist
+    - writing unit tests for code the step introduces
+    - package moves required by package-layout
+    - adding a dependency already listed in constraints.required
+
+  yellow:
+    - introducing a library not named in the specification
+    - changing an integration's transport, timeout or retry policy
+    - introducing caching, async execution or a thread pool
+
+  red:
+    - any behaviour no acceptance case covers
+    - changing the public API surface
+    - adding or removing an integration
+    - anything touching authentication, authorisation or secrets
+
+  red_handling: >
+    STOP. Write the question into decisions.yaml as a new PD entry, add it to
+    gaps/open-questions.yaml if it is a specification gap, and report. Do not
+    pick the plausible option and carry on.

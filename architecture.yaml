@@ -41,7 +41,7 @@ principles:
 
 package-layout:
 
-  base: <<REQUIRED — base package, e.g. com.example.vendortask>>
+  base: <<REQUIRED — base package, e.g. com.example.partnertask>>
 
   layers:
 

@@ -90,8 +90,8 @@ steps: []
 #     started_at: "2026-11-06T09:14:00Z"
 #     scope:
 #       files_allowed:
-#         - src/main/java/com/example/vendortask/adapter/in/web/TaskController.java
-#         - src/test/java/com/example/vendortask/adapter/in/web/TaskControllerTest.java
+#         - src/main/java/com/example/partnertask/adapter/in/web/TaskController.java
+#         - src/test/java/com/example/partnertask/adapter/in/web/TaskControllerTest.java
 #       repos_allowed: [target]
 #     depends_on:
 #       decisions: [PD-001]
@@ -104,8 +104,8 @@ steps: []
 #       cases: [A-E1-01, A-E1-02, A-E1-03]
 #       expected_result: >
 #         GET /api/v1/tasks/7 answers 200 with the body recorded in
-#         acceptance/expected/A-E1-01.json, X-TRACE-ID present, and vendor.name
-#         absent when the vendor lookup exhausts its retry budget.
+#         acceptance/expected/A-E1-01.json, X-TRACE-ID present, and partner.name
+#         absent when the partner lookup exhausts its retry budget.
 #     status: in_progress
 #     blocked_reason: null
 # ---------------------------------------------------------------------------

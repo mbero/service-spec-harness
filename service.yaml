@@ -21,7 +21,7 @@ harness:
   tier: M
 
 project:
-  name: <<REQUIRED — service name, e.g. vendor-task-service>>
+  name: <<REQUIRED — service name, e.g. partner-task-service>>
   description: >
     <<REQUIRED — one paragraph. What the service is for, who calls it, what it
     is NOT responsible for.>>

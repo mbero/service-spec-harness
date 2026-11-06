@@ -31,7 +31,7 @@ through an agent loop. That is the whole job.
 | `reports/plan/`, `reports/reviews/`, `reports/validation/` hold only `.gitkeep` | no run ever produced output |
 | `state/build-state.yaml` says `steps_total: 0`, `steps: []` | no step ever landed |
 | `specification.status: not_started` | no specification was ever agreed |
-| only `examples/vendor-task-service` is filled | it is a selftest fixture, not a run |
+| only `examples/partner-task-service` is filled | it is a selftest fixture, not a run |
 
 So the complexity is neither proven nor disproven. It is **untested**. About
 3 300 lines of control exist against zero real runs.
@@ -98,7 +98,7 @@ plan. This revokes one row of the Q12 batch; the other five stand.
 
 ### Q14 — which endpoint survives in the example?
 
-The example specifies two: `E1` (a task lookup with a vendor upstream) and
+The example specifies two: `E1` (a task lookup with a partner upstream) and
 `E2`. `E2-B03` is the only behaviour with `status: open`, and `checks/selftest.sh`
 line 121 depends on it.
 
@@ -161,7 +161,7 @@ Executed in eight steps, each followed by a full `checks/selftest.sh` run.
 | G | Five role prompts inlined into their `.claude/agents/*.md` files. `prompts/system.md` stayed shared. | −5 |
 | H | The example trimmed to one endpoint. `E2` removed; the open behaviour moved to `E1-B04` with `Q-001` rewritten to match. | −2 |
 
-Plus `examples/vendor-task-service/decisions.md`, removed with step C.
+Plus `examples/partner-task-service/decisions.md`, removed with step C.
 **Total: 20 files deleted, 0 capabilities removed.**
 
 ### What the trim could not reach

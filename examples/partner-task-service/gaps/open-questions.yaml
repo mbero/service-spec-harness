@@ -1,0 +1,29 @@
+version: 1
+
+questions:
+
+  - id: Q-001
+    status: open
+    raised_on: "2026-11-06"
+    raised_by: spec-author
+    blocks: [E1-B04]
+    question: >
+      GET /api/v1/tasks/{taskId} resolves the partner on every call. Is the
+      partner-service response cached between requests, and for how long?
+    why_it_matters: >
+      partner-service rate-limits per consumer. Without a cache a burst of reads
+      on one task exhausts the budget and degrades every other caller, which
+      E1-B03 then hides behind a 200.
+    options:
+      - id: a
+        option: No cache; resolve on every request
+        consequence: >
+          Always current, and the simplest thing to build. The rate limit then
+          constrains read throughput directly.
+      - id: b
+        option: Cache the partner response for 60 seconds per partnerId
+        consequence: >
+          Removes the burst problem, and makes a renamed partner visible up to a
+          minute late. Needs a decision on whether E1-B03 degradation is cached
+          as well.
+    asked_of: product owner

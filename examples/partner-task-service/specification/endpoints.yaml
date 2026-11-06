@@ -1,0 +1,77 @@
+version: 1
+service: partner-task-service
+consumers:
+  - partner-portal-frontend
+
+global:
+
+  - id: GL-B01
+    title: JSON serialization omits empty values
+    status: agreed
+    evidence: "PD-001"
+    observable: >
+      A null, an empty string and an empty collection are omitted from the
+      response body entirely. A consumer cannot distinguish "absent" from
+      "empty", and asserting that a field is absent is part of the contract.
+
+  - id: GL-B02
+    title: Correlation header on every response
+    status: agreed
+    evidence: "ADR-4 §2"
+    observable: >
+      Every response carries X-TRACE-ID, including error responses. When the
+      request supplies one it is echoed; otherwise a random UUID is generated.
+
+  - id: GL-B03
+    title: Errors render as RFC 7807 problem details
+    status: agreed
+    evidence: "ADR-9"
+    observable: >
+      Every 4xx and 5xx body is application/problem+json with `title` and
+      `status`. `detail` is present only when it adds information the title
+      does not already carry.
+
+endpoints:
+
+  - id: E1
+    method: GET
+    path: /api/v1/tasks/{taskId}
+    summary: Returns one task with its partner resolved
+    auth: bearer
+
+    behaviours:
+
+      - id: E1-B01
+        title: Known task returns 200 with the partner name resolved
+        status: agreed
+        evidence: "interview 2026-11-06, M.B."
+        observable: >
+          200 with id, title, status and partner.name taken from the
+          partner-service response for the task's partnerId.
+
+      - id: E1-B02
+        title: Unknown task returns 404
+        status: agreed
+        evidence: "ADR-9"
+        observable: >
+          404 with a problem+json body whose title is
+          "Task not found" and whose detail names the requested id.
+
+      - id: E1-B03
+        title: Partner outage degrades rather than fails
+        status: agreed
+        evidence: "PD-002"
+        observable: >
+          When partner-service is unavailable after its retry budget, the task is
+          still returned with 200 and the partner object carries only `id` —
+          `name` is absent, per GL-B01.
+
+      - id: E1-B04
+        title: Repeated lookups reuse the partner response
+        status: open
+        question: Q-001
+        evidence: "interview 2026-11-06, M.B."
+        observable: >
+          UNRESOLVED — whether the partner-service response is cached between
+          requests, and for how long, is not decided. See Q-001.
+          No acceptance case may be written for this behaviour until it is.

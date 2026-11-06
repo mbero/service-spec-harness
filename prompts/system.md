@@ -120,8 +120,8 @@ Every claim about what the service must do cites its source: a `PD-nnn`, an ADR
 section, a named document, or a dated and attributed conversation.
 
 ```text
-Claim:    A vendor outage must not fail the request.
-Evidence: PD-002 (DECIDED 2026-11-06) — degrade to the vendor id alone;
+Claim:    A partner outage must not fail the request.
+Evidence: PD-002 (DECIDED 2026-11-06) — degrade to the partner id alone;
           rejected alternative 503 passthrough.
 ```
 
@@ -164,7 +164,7 @@ No credential ever enters this harness or the target: not in code,
 configuration, prompts, reports, fixtures, logs or commit messages.
 
 `specification/` records sensitive configuration by **existence and purpose,
-never by value** — `base_url_property: vendor.service.url`, never the URL with
+never by value** — `base_url_property: partner.service.url`, never the URL with
 its token. Acceptance fixtures use the placeholder `{{token}}`, substituted per
 run. `checks/secrets.sh` is a tripwire for the four shapes that actually reach
 these repositories; it is not a reason to relax.

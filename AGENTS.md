@@ -18,7 +18,7 @@ apply to anyone changing the template itself.
 2. `README.md` — what the thing is
 3. `prompts/system.md` — the rules
 4. `checks/selftest.sh` output — whether the machinery still works
-5. `examples/vendor-task-service/` — what a filled instantiation looks like
+5. `examples/partner-task-service/` — what a filled instantiation looks like
 
 `docs/implementation-status.md` is a snapshot and goes stale. When it disagrees
 with what the checks actually print, **the checks are right** — fix the file.
@@ -42,7 +42,7 @@ with what the checks actually print, **the checks are right** — fix the file.
 
 `checks/harness.sh` fails at the repository root because the markers are still
 in place. That is correct. Verification runs against
-`examples/vendor-task-service`, which is a complete instantiation, and against
+`examples/partner-task-service`, which is a complete instantiation, and against
 the temporary copies `checks/selftest.sh` makes of it.
 
 ## `reports/` — output, not input

@@ -6,7 +6,7 @@
 # harness this one is derived from once consisted of `set -euo pipefail` and a
 # header — they exited 0 and reported a false pass on everything.
 #
-# Each case copies examples/vendor-task-service to a temporary directory,
+# Each case copies examples/partner-task-service to a temporary directory,
 # breaks it in exactly one way, runs the real check against the copy, and
 # asserts two things: exit code 1, and that the output names the break. The
 # second assertion matters as much as the first — a check that fails for an
@@ -17,7 +17,7 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-EXAMPLE="$ROOT/examples/vendor-task-service"
+EXAMPLE="$ROOT/examples/partner-task-service"
 VERBOSE="${1:-}"
 
 PASSED=0; FAILED=0
@@ -142,7 +142,7 @@ W="$(fresh)"; perl -0777 -pi -e 's/^    - spec_completeness$//m' "$W/service.yam
 expect_fail "the spec-completeness gate dropped from validation" \
   "omits spec_completeness" -- harness_check "$W"
 
-W="$(fresh)"; perl -0777 -pi -e 's/^  base: com.example.vendortask$/  base: <<REQUIRED — base package>>/m' "$W/architecture.yaml"
+W="$(fresh)"; perl -0777 -pi -e 's/^  base: com.example.partnertask$/  base: <<REQUIRED — base package>>/m' "$W/architecture.yaml"
 expect_fail "an unfilled marker left in a contract" \
   "unfilled marker" -- harness_check "$W"
 
@@ -150,9 +150,9 @@ expect_fail "an unfilled marker left in a contract" \
 printf '\n--- architecture ---\n'
 # ---------------------------------------------------------------------------
 
-DOMAIN='target-sample/src/main/java/com/example/vendortask/domain/model/Task.java'
+DOMAIN='target-sample/src/main/java/com/example/partnertask/domain/model/Task.java'
 
-W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport com.example.vendortask.infrastructure.config.JacksonConfig;|m' "$W/$DOMAIN"
+W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport com.example.partnertask.infrastructure.config.JacksonConfig;|m' "$W/$DOMAIN"
 expect_fail "domain reaching into infrastructure" \
   "AR-01" -- arch_check "$W"
 
@@ -160,8 +160,8 @@ W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport org.springframew
 expect_fail "HTTP annotations in a domain type" \
   "AR-02" -- arch_check "$W"
 
-W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport com.example.vendortask.adapter.out.external.VendorRestAdapter;|m' \
-  "$W/target-sample/src/main/java/com/example/vendortask/adapter/in/web/TaskController.java"
+W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport com.example.partnertask.adapter.out.external.PartnerRestAdapter;|m' \
+  "$W/target-sample/src/main/java/com/example/partnertask/adapter/in/web/TaskController.java"
 expect_fail "an inbound adapter calling an outbound one" \
   "AR-03" -- arch_check "$W"
 
@@ -174,7 +174,7 @@ printf '\n--- forbidden-tech / secrets ---\n'
 # ---------------------------------------------------------------------------
 
 W="$(fresh)"; perl -0777 -pi -e 's|^(package .*;)$|$1\n\nimport reactor.core.publisher.Mono;|m' \
-  "$W/target-sample/src/main/java/com/example/vendortask/application/GetTaskUseCase.java"
+  "$W/target-sample/src/main/java/com/example/partnertask/application/GetTaskUseCase.java"
 expect_fail "a reactive type in a blocking service" \
   "reactive types in a blocking service" -- tech_check "$W"
 
@@ -183,7 +183,7 @@ expect_fail "the reactive stack back on the classpath" \
   "not on the classpath" -- tech_check "$W"
 
 W="$(fresh)"; printf 'class TestConstants {\n    static final String TOKEN = "eyJhbGciOiJSUzUxMiJ9.eyJzdWIiOiJ0ZXN0In0.c2lnbmF0dXJl";\n}\n' \
-  > "$W/target-sample/src/main/java/com/example/vendortask/TestConstants.java"
+  > "$W/target-sample/src/main/java/com/example/partnertask/TestConstants.java"
 expect_fail "a token pasted into a test constant" \
   "JWT literal" -- secret_check "$W"
 

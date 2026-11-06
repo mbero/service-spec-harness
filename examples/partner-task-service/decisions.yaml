@@ -1,0 +1,32 @@
+meta:
+  version: 1
+
+decisions:
+
+  - id: PD-001
+    title: Response serialization omits empty values
+    risk: MEDIUM
+    authority: red
+    status: DECIDED
+    decided_on: "2026-11-06"
+    decided_by: Marcin Berendt
+    blocking: []
+    outcome: >
+      Jackson NON_EMPTY, matching every other service in the space. The
+      consequence is deliberate and is part of the contract: a consumer cannot
+      distinguish absent from empty, so absence is asserted explicitly in the
+      acceptance cases.
+
+  - id: PD-002
+    title: Behaviour when partner-service is unavailable
+    risk: HIGH
+    authority: red
+    status: DECIDED
+    decided_on: "2026-11-06"
+    decided_by: Marcin Berendt
+    blocking: []
+    outcome: >
+      Degrade, do not fail. The task is still returned with 200 and the partner
+      object carries id only. The outage is visible on the metric
+      partnertask.partner.degraded, not in the response. Rejected alternative:
+      503 passthrough, which turns one upstream's incident into ours.
