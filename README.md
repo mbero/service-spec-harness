@@ -138,7 +138,7 @@ consequence of each, or it does not count as a question.
 | `checks/` | the gates, plus the selftest that proves each one can fail |
 | `prompts/system.md` | the shared system prompt; each role prompt lives inside its agent file |
 | `state/build-state.yaml` | the ledger: what has landed, and the one task in flight |
-| `.claude/` | five subagents, five slash commands, the deny rules |
+| `.claude/` | five subagents, seven slash commands, the deny rules, the hooks behind `/spec-log` |
 | `examples/partner-task-service/` | a complete worked instantiation — and the selftest fixture |
 | `docs/design-notes.md` | why it is shaped this way, and what was deliberately dropped |
 
@@ -159,19 +159,145 @@ endpoint, seven behaviours, one upstream, three approved cases, one deliberately
 open question, and a clean Java sample for the code checks to pass on. Reading
 it is faster than reading the format documentation.
 
-### Then instantiate
+---
 
-1. Copy the repository next to the service you are building.
-2. Replace every `<<REQUIRED — …>>` marker in `service.yaml` and
-   `architecture.yaml`.
-   **The template deliberately does not pass its own checks** —
-   `checks/harness.sh` fails while a marker remains. An instantiation passes.
-   (A marker is checked; a `TODO` comment rots silently. That is the whole
-   reason for the convention.)
-3. Run `/spec-elicit`. Answer the questions it returns. Answer them again after
-   it finds the second layer.
-4. **Approve the acceptance cases** — a person, by name, in the file.
-5. Run `/spec-next`, then `/spec-review`. Repeat.
+## Tutorial — one service, from empty directory to reviewed code
+
+### Step 0 — one copy of the template per service
+
+This repository is a **template**. You do not run several services out of one
+copy, and you do not point one copy at two target repositories. Each service
+gets its own copy, because `service.yaml`, `specification/`, `acceptance/`,
+`decisions.yaml` and `state/` all describe exactly one service and have nowhere
+to put a second.
+
+```sh
+git clone https://github.com/mbero/service-spec-harness.git my-service-harness
+cd my-service-harness
+rm -rf .git && git init          # it is your repository now, not a fork of the template
+uv sync                          # or: pip install pyyaml
+```
+
+Put the copy **next to** the service repository, not inside it. The harness is
+versioned separately: it holds the specification and the oracle, and those
+outlive any single branch of the service.
+
+```
+~/work/
+  my-service/              <- the target repository, where code lands
+  my-service-harness/      <- this copy
+```
+
+### Step 1 — prove the gates work before you trust them
+
+```sh
+checks/selftest.sh
+```
+
+26 cases must pass. Each one copies the worked example, breaks it in exactly one
+way, and asserts the real check fails **naming that break**. Until you have seen
+this pass, nothing else in this repository has earned belief.
+
+```sh
+checks/harness.sh                # MUST fail here: the markers are still in place
+```
+
+A fresh template fails its own check on purpose. That failure is the to-do list
+for step 2.
+
+### Step 2 — fill the manifest
+
+Replace every `<<REQUIRED — …>>` marker in `service.yaml` and
+`architecture.yaml`:
+
+| Field | What to put |
+|---|---|
+| `project.name` | the service name |
+| `project.description` | one paragraph, and say what the service is **not** responsible for |
+| `repositories.target.path` | absolute path to the service repository |
+| `repositories.target.branch` | the one branch all work lands on |
+| `harness.mode` | `greenfield`, `port` or `rewrite` — see *Modes and tiers* |
+| `harness.tier` | `S`, `M` or `L` |
+| `constraints.forbidden` | each banned library, with the reason printed on violation |
+| `architecture.yaml` → `package-layout.base` | the base package |
+
+```sh
+checks/harness.sh                # now exits 0
+```
+
+Restart your Claude Code session after this step. Hooks load when a session
+starts, so `/spec-log` records nothing until you do.
+
+### Step 3 — the commands, and what each one is responsible for
+
+Seven commands. Five of them start an agent; two only read.
+
+| Command | Starts | Writes | Responsible for |
+|---|---|---|---|
+| `/spec-status` | — | nothing | Telling you where the build stands. Safe first command in any session. |
+| `/spec-elicit` | `spec-author` | `specification/`, `acceptance/`, `gaps/`, `decisions.yaml` | Turning your intention into behaviours and the cases that prove them — **and listing what it could not decide**. |
+| `/spec-plan` | `build-orchestrator` | `reports/plan/`, `state/` | Cutting the specification into ordered steps `S01..Sxx`, and refusing to schedule what an open decision gates. |
+| `/spec-next` | `build-implementer` | target code and tests, `state/` | Building **one** step. It is denied write access to `acceptance/`. |
+| `/spec-review` | `build-reviewer`, then `independent-advisor` | `reports/reviews/` | Accepting or rejecting that step. The advisor runs second and tries to prove the reviewer missed something. |
+| `/spec-check` | — | nothing | Running `checks/all.sh` and separating failures that belong to the step in flight from pre-existing ones. |
+| `/spec-log` | — | nothing | Showing which agent ran, in what order, and what it wrote. |
+
+### Step 4 — the loop, in order
+
+```
+  /spec-elicit  ──▶  YOU answer the questions  ──┐
+        ▲                                        │
+        └──────  more questions appear  ◀────────┘
+                            │
+                      YOU agree the behaviours
+                      YOU approve the cases
+                            │
+                       /spec-plan
+                            │
+            ┌──────▶  /spec-next  ──▶  /spec-check  ──▶  /spec-review
+            │                                                   │
+            └───────────  YOU commit  ◀───────  accept ─────────┘
+```
+
+1. **`/spec-elicit`** — the author drafts and asks. Expect a second round: the
+   first answers usually expose the next layer of questions.
+2. **You answer.** Then set `status: agreed` on the behaviours you accept.
+   Nothing is implementable while it is `proposed` or `open`.
+3. **You approve the cases** — in `acceptance/cases/*.yaml`, with your own name
+   in `approved.by`. An approver whose name looks like an agent is rejected by
+   name. This is the step that makes the whole harness mean anything.
+4. **`/spec-plan`** — the orchestrator produces `S01..Sxx`. It refuses to plan
+   while `checks/spec-completeness.sh` is red, and it names what it could not
+   schedule instead of planning around it.
+5. **`/spec-next`** — one step. The implementer writes code and tests and runs
+   that step's checks.
+6. **`/spec-check`** — run the gates yourself rather than believing the report.
+7. **`/spec-review`** — reviewer, then advisor, independently. A `CRITICAL`
+   advisor finding halts the build.
+8. **You commit.** No agent ever runs `git commit`, `git push` or
+   `git checkout -b`. The implementer finishes on working-tree changes.
+9. Back to 5 until `state/build-state.yaml` says every step landed.
+
+### The three things only you can do
+
+The harness is built so that an agent cannot do these, not merely so that it
+should not:
+
+| Gate | Why it is yours |
+|---|---|
+| Agreeing a behaviour | A `proposed` behaviour is the author's draft. An agent that could agree its own draft would be inventing requirements. |
+| Approving a case | The oracle decides what *done* means. An agent that approved it would be marking its own homework. |
+| Committing and pushing | Irreversible and visible to other people. |
+
+### When something goes wrong
+
+| Symptom | Where to look |
+|---|---|
+| `/spec-next` refuses | `state/build-state.yaml` → `current` is `in_progress` or `blocked`, or an `OPEN` decision in `decisions.yaml` blocks the step |
+| `/spec-plan` refuses | `checks/spec-completeness.sh` is red — answer questions, do not plan around them |
+| A check fails and you do not know whose fault it is | `/spec-check` splits it into *this step*, *pre-existing* and *harness* |
+| You do not know what the agents actually did | `/spec-log` |
+| The ledger and reality disagree | `state/build-state.yaml` `steps:` is the fact; `current:` is only an intention |
 
 ---
 
@@ -210,7 +336,7 @@ exits `1`, **and** that the output names that specific break. A check that fails
 for an unrelated reason is not evidence, so the second assertion matters as much
 as the first.
 
-Twenty-seven cases, including:
+Twenty-six cases, including:
 
 - an agreed behaviour that no case proves
 - a case approved by an agent instead of a person
