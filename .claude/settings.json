@@ -34,17 +34,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/bin/agent-log hook"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
+        "matcher": "Task|Write|Edit|NotebookEdit|Bash",
         "hooks": [
           {
             "type": "command",

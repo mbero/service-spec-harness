@@ -160,6 +160,11 @@ printf '{\n  "permissions": {\n    "deny": [\n      "Write(./acceptance/**)",\n 
 expect_fail "a path deny on the oracle, which blocks the author and stops no shell" \
   "blocks spec-author" -- harness_check "$W"
 
+W="$(fresh)"; mkdir -p "$W/.claude/agents"
+printf -- '---\nname: drive-by\ntools: Read\n---\n' > "$W/.claude/agents/drive-by.md"
+expect_fail "an agent that declares no model and inherits the session's" \
+  "names no model" -- harness_check "$W"
+
 W="$(fresh)"; perl -0777 -pi -e 's/^  mode: greenfield$/  mode: port/m' "$W/service.yaml"
 expect_fail "port mode with no oracle to point at" \
   "the oracle is the whole point of that mode" -- harness_check "$W"
@@ -209,6 +214,15 @@ printf '\n--- oracle-guard ---\n'
 # every shell write refused, every read and every heredoc body let through.
 expect_pass "every oracle-guard probe lands on the right side" \
   -- "$HERE/oracle-guard-cases.sh" "$ROOT"
+
+# ---------------------------------------------------------------------------
+printf '\n--- agent-log ---\n'
+# ---------------------------------------------------------------------------
+# The log answers "which agent did this", and it answered wrongly for a while.
+# checks/agent-log-cases.sh feeds synthetic hook payloads and asserts the name
+# on each rendered line.
+expect_pass "agent-log attributes every line to the right agent" \
+  -- "$HERE/agent-log-cases.sh" "$ROOT"
 
 # ---------------------------------------------------------------------------
 printf '\n--- architecture ---\n'

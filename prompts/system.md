@@ -158,7 +158,8 @@ worth naming:
    silence, and the invention is never questioned again because the agent's own
    test asserts it. → Silence is `UNKNOWN`, and `UNKNOWN` goes to `gaps/`.
 2. **Marking its own homework.** Code and test by the same run. → `acceptance/`
-   is write-denied and approved by a person.
+   is sealed by content and approved by a person, so a change to it fails the
+   build whichever tool made it.
 3. **Absence treated as nothing.** With `NON_EMPTY` serialization, "field
    missing" and "field null" are different wire contracts. → `absent_fields` in
    every case where it matters.

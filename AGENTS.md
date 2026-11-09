@@ -76,10 +76,16 @@ shipped* is the most useful thing in that directory six weeks later.
 | `settings.json` | the path denials, and the hooks that feed `bin/agent-log` |
 
 The denials are the part that is enforced. The hooks are the part that is
-observed: they fire on `Task`, on `Write`/`Edit`, on an interesting `Bash`, and
-on `SubagentStop`, and they append to `reports/agent-log.tsv`. A hook never
+observed: they fire before and after `Task`, after `Write`/`Edit`, and after an
+interesting `Bash`, and they append to `reports/agent-log.tsv`. A hook never
 blocks a tool call — `bin/agent-log hook` always exits `0`, because a logger
 that can break the build gets deleted the first time it does.
+
+The pair of `Task` hooks is what makes the log readable. A write between
+`PreToolUse` and `PostToolUse` on one `Task` call belongs to the subagent that
+call named: the parent sits blocked for exactly that span. `SubagentStop` is
+**not** registered — measured on a real log it fired 118 times for 2 subagents,
+so it closes nothing. `checks/agent-log-cases.sh` proves the attribution.
 
 Hooks are read when a session starts. A hook added mid-session records nothing
 until the next one.
@@ -89,20 +95,35 @@ until the next one.
 Each agent file carries its own role prompt. `prompts/system.md` is the one
 shared prompt, and every agent reads it first.
 
-| Agent | Writes |
-|---|---|
-| `spec-author` | `specification/`, `acceptance/`, `gaps/`, `decisions.yaml` |
-| `build-orchestrator` | `reports/plan/`, `state/`, `decisions.yaml` |
-| `build-implementer` | the target code and its tests, `state/`, `reports/validation/` |
-| `build-reviewer` | `reports/reviews/Sxx.md` only |
-| `independent-advisor` | `reports/reviews/Sxx-advisor.md` only |
+| Agent | Writes | Model |
+|---|---|---|
+| `spec-author` | `specification/`, `acceptance/`, `gaps/`, `decisions.yaml` | `opus` |
+| `build-orchestrator` | `reports/plan/`, `state/`, `decisions.yaml` | `opus` |
+| `build-implementer` | the target code and its tests, `state/`, `reports/validation/` | `sonnet` |
+| `build-reviewer` | `reports/reviews/Sxx.md` only | `opus` |
+| `independent-advisor` | `reports/reviews/Sxx-advisor.md` only | `opus` |
+
+The models are a deliberate asymmetry, and the oracle is what pays for it.
+`build-implementer` writes the most code by a wide margin, and every line it
+writes passes `checks/all.sh` and the acceptance cases before anyone believes
+it — so it runs on the cheaper model. The other four either define the truth
+(`spec-author`), decide what may be scheduled (`build-orchestrator`), or exist
+to catch what a previous agent missed (`build-reviewer`,
+`independent-advisor`), and nothing downstream checks them. They stay on `opus`.
+
+A hard oracle is what lets you cheapen the generator. Soften the oracle and
+this table becomes reckless.
+
+`checks/harness.sh` fails if any agent file declares no `model:`, because an
+undeclared model is not a choice — it is the session default wearing one.
 
 The reviewer and the advisor have **no `Edit`**, deliberately. A reviewer that
 can fix what it finds ends up reviewing its own work, and the loop loses its
 only independent signal.
 
 `spec-author` and `build-implementer` are **never the same run**. The author
-writes the oracle; the implementer is denied write access to it. If one agent
+writes the oracle; the implementer may not change it, and the seal catches it
+if it tries. If one agent
 ever does both, this harness is decoration.
 
 ## What is actually enforced
@@ -165,5 +186,5 @@ A format change usually touches four files at once. Change them together:
 | an architecture rule | `architecture.yaml` only — `checks/architecture.sh` reads it, nothing is hardcoded |
 | a manifest field | `service.yaml`, `checks/harness.sh`, the example manifest |
 
-Then run `checks/selftest.sh`. If it still passes 32/32 without you having
+Then run `checks/selftest.sh`. If it still passes 34/34 without you having
 touched it, ask whether your change was actually covered.

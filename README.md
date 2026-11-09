@@ -86,7 +86,7 @@ reported by name.
           ▼
    ┌──────────────┐
    │ implementer  │  builds exactly one step
-   └──────┬───────┘  acceptance/ is write-denied to it
+   └──────┬───────┘  it may not change acceptance/; the seal catches it
           │
           ▼
    ┌──────────────┐     ┌──────────────────────┐
@@ -253,10 +253,17 @@ Seven commands. Five of them start an agent; two only read.
 | `/spec-status` | — | nothing | Telling you where the build stands. Safe first command in any session. |
 | `/spec-elicit` | `spec-author` | `specification/`, `acceptance/`, `gaps/`, `decisions.yaml` | Turning your intention into behaviours and the cases that prove them — **and listing what it could not decide**. |
 | `/spec-plan` | `build-orchestrator` | `reports/plan/`, `state/` | Cutting the specification into ordered steps `S01..Sxx`, and refusing to schedule what an open decision gates. |
-| `/spec-next` | `build-implementer` | target code and tests, `state/` | Building **one** step. It is denied write access to `acceptance/`. |
+| `/spec-next` | `build-implementer` | target code and tests, `state/` | Building **one** step. If it touches `acceptance/`, the seal breaks and the build goes red. |
 | `/spec-review` | `build-reviewer`, then `independent-advisor` | `reports/reviews/` | Accepting or rejecting that step. The advisor runs second and tries to prove the reviewer missed something. |
 | `/spec-check` | — | nothing | Running `checks/all.sh` — including `oracle-integrity` — and separating failures that belong to the step in flight from pre-existing ones. |
 | `/spec-log` | — | nothing | Showing which agent ran, in what order, and what it wrote. |
+
+`build-implementer` runs on `sonnet`; the other four run on `opus`. The
+implementer writes the most code, and every line of it passes `checks/all.sh`
+and the acceptance cases before anyone believes it. The other four define the
+truth or exist to catch what an earlier agent missed, and nothing downstream
+checks them. Change the mapping in `.claude/agents/*.md` — `checks/harness.sh`
+fails if an agent file names no model at all.
 
 ### Step 4 — the loop, in order
 
@@ -364,7 +371,7 @@ exits `1`, **and** that the output names that specific break. A check that fails
 for an unrelated reason is not evidence, so the second assertion matters as much
 as the first.
 
-Thirty-two cases, including:
+Thirty-four cases, including:
 
 - an agreed behaviour that no case proves
 - a case approved by an agent instead of a person

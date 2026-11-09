@@ -142,7 +142,22 @@ while IFS= read -r line; do
   [[ -n "$line" ]] && violation "$line"
 done <<< "$MANIFEST_FINDINGS"
 
-# --- 4. Every check is covered by the selftest ------------------------------
+# --- 4. Every agent names a model -------------------------------------------
+# An agent with no `model:` inherits the session model. That means the step
+# that writes the most code and the adversarial gate that doubts it run on the
+# same model, and the bill looks the same whichever one you were paying for.
+# Which model fits which role is a decision; an undeclared model is a default
+# pretending to be one.
+AGENTS_DIR="$HROOT/.claude/agents"
+if [[ -d "$AGENTS_DIR" ]]; then
+  for agent_file in "$AGENTS_DIR"/*.md; do
+    [[ -e "$agent_file" ]] || continue
+    grep -qE '^model:' "$agent_file" || \
+      violation ".claude/agents/$(basename "$agent_file") names no model — it inherits the session model silently"
+  done
+fi
+
+# --- 5. Every check is covered by the selftest ------------------------------
 # "Never ship a check that cannot fail" is a rule, so it is checked.
 SELFTEST="$HARNESS_ROOT/checks/selftest.sh"
 if [[ ! -f "$SELFTEST" ]]; then

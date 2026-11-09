@@ -22,9 +22,15 @@ exists. Treat a refusal here as a nudge, never as a security boundary.
 
 ## Decision rule
 
-Deny when a command segment mentions the oracle path and its leading word is
-not a known read-only one. Err towards denying: a false refusal costs one
-message, a false allow costs a silent oracle edit.
+Deny when a command segment mentions the oracle path **and** names a way to
+change it: a writing verb, an interpreter, a redirection into it, an in-place
+flag, or a writing `git` subcommand. Allow everything else.
+
+Err towards allowing. That is the opposite of what it looks like it should be,
+and it is deliberate — see the comment on `WRITERS`. A false refusal teaches an
+agent to route around the guard, and routing around is the behaviour the whole
+mechanism exists to stop. A false allow costs nothing that
+`checks/oracle-integrity.sh` does not already catch.
 
 Always exits 0. A hook that can crash a tool call gets deleted the first time
 it does.
@@ -36,22 +42,43 @@ import sys
 
 ORACLE = "acceptance"
 
-# Reading the oracle is normal and frequent: every agent needs the cases.
-READ_ONLY = {
-    "cat", "head", "tail", "less", "more", "ls", "find", "stat", "file",
-    "grep", "egrep", "fgrep", "rg", "ack", "wc", "diff", "cmp", "md5",
-    "shasum", "sha256sum", "awk", "sort", "uniq", "comm", "cut", "tr",
-    "basename", "dirname", "realpath", "echo", "printf", "test", "true",
-    # sed prints unless it is given -i, and the -i case is caught below.
-    # perl is deliberately absent: `perl -e 'open(...)'` writes with no flag
-    # to look for, so there is nothing here to check it against.
-    "sed",
+# Named writers, and interpreters that can write without saying so.
+#
+# This list used to run the other way — an allowlist of readers, deny anything
+# unlisted. That refused `du`, `n=$(grep -c ...)`, and a commit message that
+# only named the oracle, all in one afternoon. The tail of harmless commands is
+# endless, and every false refusal teaches an agent to route around the guard,
+# which is the behaviour this whole mechanism exists to stop.
+#
+# So: deny the verbs that write, and the redirections. An unlisted writer gets
+# through — `sponge`, some tool nobody here has heard of. That is acceptable
+# only because this was never the boundary. `checks/oracle-integrity.sh` hashes
+# the oracle and catches the change whatever wrote it.
+WRITERS = {
+    "cp", "mv", "rm", "rmdir", "mkdir", "touch", "tee", "dd", "truncate",
+    "install", "ln", "chmod", "chown", "rsync", "patch", "sponge",
+    "ed", "ex", "vi", "vim", "nano", "emacs",
+    "tar", "zip", "unzip", "gzip", "gunzip",
+    # Interpreters do anything at all, so the oracle in their argument is
+    # enough on its own.
+    "python", "python3", "perl", "ruby", "node", "sh", "bash", "zsh",
 }
+
+# `sed -n` prints, `sed -i` rewrites. Same shape for the others.
+IN_PLACE = {"sed", "gsed", "awk", "yq", "jq", "perl"}
+
+# git is both. `git diff acceptance/` is a read every reviewer runs; these
+# subcommands put different bytes on disk.
+GIT_WRITERS = {"checkout", "restore", "rm", "mv", "apply", "clean", "stash",
+               "reset", "switch"}
 
 # The harness's own tooling reads and seals the oracle on purpose.
 ALLOWED_PREFIXES = ("checks/", "./checks/", "bin/", "./bin/")
 
-SPLIT = re.compile(r"\|\||&&|[;|\n]")
+# A command substitution is a command, so it gets its own segment. Without
+# `$(` here, `n=$(grep -c x acceptance/cases/a.yaml)` reads as one segment whose
+# leading word is `-c`, and a plain count gets refused.
+SPLIT = re.compile(r"\|\||&&|\$\(|[;|`\n]")
 ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
 
@@ -87,7 +114,7 @@ def leading_word(segment):
 
 
 def is_write(segment):
-    """True when this segment mentions the oracle and is not a plain read."""
+    """True when this segment mentions the oracle and names a way to change it."""
     if ORACLE not in segment:
         return False
 
@@ -101,12 +128,13 @@ def is_write(segment):
         return True
 
     base = word.rsplit("/", 1)[-1]
-    if base not in READ_ONLY:
+    if base in WRITERS:
         return True
-
-    # `sed -n` prints; `sed -i` rewrites in place.
-    if base in ("sed", "perl") and re.search(r"\s-\w*i", segment):
+    if base in IN_PLACE and re.search(r"\s-\w*i\b", segment):
         return True
+    if base == "git":
+        words = segment.split()
+        return any(w in GIT_WRITERS for w in words[1:4])
     return False
 
 

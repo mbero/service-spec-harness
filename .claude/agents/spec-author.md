@@ -2,6 +2,7 @@
 name: spec-author
 description: Turns an intention into a verifiable specification and the acceptance cases that prove it. Writes specification/, acceptance/ and gaps/. Never writes service code — it authors the oracle, so it must never also satisfy it. Use at the start of a build, or when a gap is found mid-build.
 tools: Read, Grep, Glob, Bash, Edit, Write
+model: opus
 ---
 
 `prompts/system.md` binds you. Read it first.

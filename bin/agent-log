@@ -25,22 +25,36 @@ gets removed the first time it has a bug.
 Recorded, from the hook payload, never guessed:
 
   start   a Task tool call began     — carries the real `subagent_type`
-  stop    a subagent finished        — carries its own transcript, not its name
+  end     that Task tool call returned — carries the same name
   write   a Write/Edit landed        — carries the file path
   bash    a Bash command ran         — carries the command
   note    a human or agent milestone
 
-Each line also carries a `stream`: the first 8 characters of a hash of the
-transcript path. The main conversation is one stream; every subagent is its own.
-That part is a fact.
+**Attribution is by time interval, not by transcript.** A `write` between a
+`start` and its `end` belongs to the agent that `start` named: the parent is
+blocked inside the Task call for exactly that span, so nothing else could have
+written. Outside every interval, the work is the main session's.
 
-**The agent name on a `write` line is inferred.** A hook firing inside a
-subagent reports that subagent's transcript, not the name it was spawned under —
-the name only ever appears in the PARENT's `start` line. `show` pairs a new
-stream with the most recent unclosed `start`. That is correct while agents run
-one at a time, which is what `state/build-state.yaml` `current` enforces. Run
-two at once and the pairing can swap them, so `show` prints a warning when it
-sees overlap instead of presenting a guess as a fact.
+The first version of this script attributed by `stream` — 8 characters of a
+hash of the transcript path — on the assumption that a subagent reports its own
+transcript. Measured against a real 259-row log, that assumption is false:
+every row, parent and subagent alike, carried **one** stream. The column is
+still recorded, because it costs nothing and may separate streams on another
+version, but nothing depends on it any more.
+
+`SubagentStop` is not used, and `.claude/settings.json` no longer registers it.
+In the same log it fired **118 times for 2 subagents** — roughly once every 30
+seconds of a subagent's life, not once at its end. A signal that fires 59 times
+per event cannot close an interval.
+
+Overlap: two `start`s open at once means the intervals nest, and a write in the
+inner one could belong to either agent. `show` says so rather than presenting
+the guess as a fact. The harness runs agents one at a time, which
+`state/build-state.yaml` `current` enforces, so this should stay rare.
+
+Set `AGENT_LOG` to point the log somewhere else. `checks/agent-log-cases.sh`
+uses it to feed synthetic payloads through this script without touching the
+real log.
 """
 
 import hashlib
@@ -50,7 +64,7 @@ import sys
 import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOG = os.path.join(ROOT, "reports", "agent-log.tsv")
+LOG = os.environ.get("AGENT_LOG") or os.path.join(ROOT, "reports", "agent-log.tsv")
 
 MAX_DETAIL = 160
 MAIN = "main"
@@ -101,11 +115,15 @@ def cmd_hook():
         return
 
     if event_name == "SubagentStop":
-        # The payload names no agent. `show` resolves it from the open starts.
-        append("stop", stream, "-", "")
+        # Deliberately dropped. It fired 118 times for 2 subagents in a real
+        # log, so it closes nothing. PostToolUse on Task closes the interval.
         return
 
     if event_name == "PostToolUse":
+        if tool in ("Task", "Agent"):
+            agent = args.get("subagent_type") or "general-purpose"
+            append("end", stream, agent, args.get("description") or "")
+            return
         if tool in ("Write", "Edit", "NotebookEdit"):
             path = args.get("file_path") or args.get("notebook_path") or ""
             rel = os.path.relpath(path, ROOT) if path.startswith(ROOT) else path
@@ -141,40 +159,37 @@ def read_rows():
 
 
 def resolve(rows):
-    """Attach an agent name to every stream. See the module docstring.
+    """Attach an agent name to every row by time interval. See the docstring.
 
-    A stream that ever emits a `start` is a parent: only the conversation that
-    calls the Task tool sees that event. The first stream in the log is the main
-    session for the same reason — it spawned everything after it. Every other
-    stream is a subagent, and it belongs to the newest start still unclosed.
+    A `start` opens an interval, the matching `end` closes it. Anything logged
+    in between came from the named subagent, because the parent is blocked
+    inside the Task call for that whole span. Anything outside is the main
+    session's own work.
+
+    Legacy `stop` rows, written by the old SubagentStop hook, are dropped: in
+    practice that event fired dozens of times per subagent and closing on it
+    would cut every interval short.
     """
-    parents = {r["stream"] for r in rows if r["event"] == "start"}
-    if rows:
-        parents.add(rows[0]["stream"])
-
-    owner = {s: MAIN for s in parents}
-    open_starts = []          # agent names spawned and not yet stopped
+    rows = [r for r in rows if r["event"] != "stop"]
+    open_agents = []          # names spawned and not yet returned
     overlapped = False
 
     for row in rows:
-        stream = row["stream"]
-        if row["event"] == "start":
-            if open_starts:
+        event = row["event"]
+        if event == "start":
+            if open_agents:
                 overlapped = True
-            open_starts.append(row["actor"])
+            open_agents.append(row["actor"])
             continue
-        if stream not in owner:
-            owner[stream] = open_starts[-1] if open_starts else "?"
-        if row["event"] == "stop" and open_starts:
-            resolved = owner.get(stream)
-            if resolved in open_starts:
-                open_starts.remove(resolved)
-            else:
-                open_starts.pop()
-
-    for row in rows:
+        if event == "end":
+            if row["actor"] in open_agents:
+                open_agents.remove(row["actor"])
+            elif open_agents:
+                open_agents.pop()
+            continue
         if row["actor"] == "-":
-            row["actor"] = owner.get(row["stream"], "?")
+            row["actor"] = open_agents[-1] if open_agents else MAIN
+
     return rows, overlapped
 
 
@@ -185,10 +200,18 @@ def cmd_show(limit):
         print("Nothing has run since the last `bin/agent-log clear`.")
         return
     rows, overlapped = resolve(rows)
+    if not rows:
+        print("agent-log holds only legacy SubagentStop rows, which say nothing.")
+        print("Run `bin/agent-log clear` and the next run records intervals.")
+        return
+    # Count over the WHOLE log, not the slice `-n` is about to print: the
+    # unclosed `start` that makes the names wrong is usually scrolled off.
+    unclosed = (sum(1 for r in rows if r["event"] == "start")
+                - sum(1 for r in rows if r["event"] == "end"))
     if limit:
         rows = rows[-limit:]
 
-    glyph = {"start": "▶", "stop": "■", "write": "✎", "bash": "$", "note": "•"}
+    glyph = {"start": "▶", "end": "■", "write": "✎", "bash": "$", "note": "•"}
     width = max(len(r["actor"]) for r in rows)
 
     print("%-19s  %-*s  %s" % ("when", width, "agent", "what"))
@@ -201,6 +224,13 @@ def cmd_show(limit):
         print()
         print("WARNING: two agents overlapped. The agent name on a write line is")
         print("         inferred from spawn order and can be wrong here.")
+
+    if unclosed > 0:
+        print()
+        print("WARNING: %d Task call(s) never recorded an `end`, so their interval" % unclosed)
+        print("         never closes and later lines inherit that agent's name.")
+        print("         A log written before the PostToolUse hook covered `Task`")
+        print("         always looks like this. Run `bin/agent-log clear`.")
 
 
 def main():

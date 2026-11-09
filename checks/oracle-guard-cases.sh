@@ -38,16 +38,33 @@ probe deny "ls && cat > $ORACLE/cases/x.yaml"
 probe deny "cat > $ORACLE/cases/x.yaml <<'EOF'
 id: A-E1-01
 EOF"
+probe deny "n=\$(cat > $ORACLE/cases/x.yaml)"
+probe deny "touch $ORACLE/cases/x.yaml"
+probe deny "mkdir $ORACLE/cases/sub"
+probe deny "ln -sf /tmp/a $ORACLE/cases/x.yaml"
+probe deny "patch -p1 $ORACLE/cases/x.yaml < /tmp/d"
+probe deny "git checkout -- $ORACLE/cases"
+probe deny "git restore $ORACLE/"
+probe deny "awk -i inplace '{print}' $ORACLE/cases/x.yaml"
 
 echo "--- must ALLOW: a read of the oracle ---"
 probe allow "cat $ORACLE/cases/x.yaml"
 probe allow "grep -rn marker $ORACLE/"
+probe allow "n=\$(grep -c id: $ORACLE/cases/x.yaml)"
+probe allow "for f in \$(ls $ORACLE/cases); do echo \$f; done"
 probe allow "ls $ORACLE/cases"
 probe allow "find $ORACLE -name '*.yaml'"
 probe allow "sed -n '1,20p' $ORACLE/cases/x.yaml"
 probe allow "shasum -a 256 $ORACLE/cases/x.yaml"
 probe allow "./checks/oracle-integrity.sh --seal ."
 probe allow "wc -l $ORACLE/cases/*.yaml"
+# The inverted rule exists for these: harmless commands nobody thought to list.
+probe allow "du -sh $ORACLE"
+probe allow "tree $ORACLE/cases"
+probe allow "nl $ORACLE/cases/x.yaml"
+probe allow "git diff $ORACLE/cases"
+probe allow "git log --oneline -- $ORACLE/"
+probe allow "git commit -m 'rewrite the $ORACLE README to the shell shape'"
 
 echo "--- must ALLOW: prose that names the oracle inside a heredoc body ---"
 probe allow "git commit -F - <<'MSG'
