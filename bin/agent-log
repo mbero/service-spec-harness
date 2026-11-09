@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""Agent run log — who did what, in order.
+
+The harness runs five agents, one at a time, driven by slash commands. Nothing
+in `state/` records the author or the reviewer: that file is the orchestrator's
+ledger of landed `Sxx` steps, not a trace. This script is the trace.
+
+It is fed by hooks in `.claude/settings.json`, so it records what actually
+happened rather than what an agent said it did. Stdlib only, and it never calls
+`bin/py`: a hook runs on every file write, and `uv run --locked` on that path
+would add seconds per edit. It needs no third-party module, so the rule that
+sends every check through `bin/py` does not buy anything here.
+
+    bin/agent-log hook          read one hook event on stdin and append it
+    bin/agent-log note TEXT     append a milestone by hand
+    bin/agent-log show [-n N]   the readable timeline
+    bin/agent-log raw           the TSV, unrendered
+    bin/agent-log clear         truncate the log
+
+`hook` ALWAYS exits 0. A logger that can block a tool call is a logger that
+gets removed the first time it has a bug.
+
+## What is recorded, and what is inferred
+
+Recorded, from the hook payload, never guessed:
+
+  start   a Task tool call began     — carries the real `subagent_type`
+  stop    a subagent finished        — carries its own transcript, not its name
+  write   a Write/Edit landed        — carries the file path
+  bash    a Bash command ran         — carries the command
+  note    a human or agent milestone
+
+Each line also carries a `stream`: the first 8 characters of a hash of the
+transcript path. The main conversation is one stream; every subagent is its own.
+That part is a fact.
+
+**The agent name on a `write` line is inferred.** A hook firing inside a
+subagent reports that subagent's transcript, not the name it was spawned under —
+the name only ever appears in the PARENT's `start` line. `show` pairs a new
+stream with the most recent unclosed `start`. That is correct while agents run
+one at a time, which is what `state/build-state.yaml` `current` enforces. Run
+two at once and the pairing can swap them, so `show` prints a warning when it
+sees overlap instead of presenting a guess as a fact.
+"""
+
+import hashlib
+import json
+import os
+import sys
+import time
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG = os.path.join(ROOT, "reports", "agent-log.tsv")
+
+MAX_DETAIL = 160
+MAIN = "main"
+
+
+def _now():
+    return time.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _clean(text, limit=MAX_DETAIL):
+    s = " ".join(str(text or "").split())
+    return s[: limit - 1] + "…" if len(s) > limit else s
+
+
+def _stream(transcript_path):
+    """Stable short id for one conversation. '' means the main session."""
+    if not transcript_path:
+        return MAIN
+    return hashlib.sha1(str(transcript_path).encode("utf-8")).hexdigest()[:8]
+
+
+def append(event, stream, actor, detail):
+    os.makedirs(os.path.dirname(LOG), exist_ok=True)
+    line = "\t".join((_now(), event, stream, actor or "-", _clean(detail)))
+    with open(LOG, "a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+
+
+def cmd_hook():
+    """Never raises, never blocks. Exit code is always 0."""
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
+        return
+    if not isinstance(payload, dict):
+        return
+
+    event_name = payload.get("hook_event_name") or ""
+    tool = payload.get("tool_name") or ""
+    args = payload.get("tool_input") or {}
+    if not isinstance(args, dict):
+        args = {}
+    stream = _stream(payload.get("transcript_path"))
+
+    if event_name == "PreToolUse" and tool in ("Task", "Agent"):
+        agent = args.get("subagent_type") or "general-purpose"
+        append("start", stream, agent, args.get("description") or "")
+        return
+
+    if event_name == "SubagentStop":
+        # The payload names no agent. `show` resolves it from the open starts.
+        append("stop", stream, "-", "")
+        return
+
+    if event_name == "PostToolUse":
+        if tool in ("Write", "Edit", "NotebookEdit"):
+            path = args.get("file_path") or args.get("notebook_path") or ""
+            rel = os.path.relpath(path, ROOT) if path.startswith(ROOT) else path
+            append("write", stream, "-", "%s %s" % (tool.lower(), rel))
+        elif tool == "Bash":
+            command = args.get("command") or ""
+            if _interesting(command):
+                append("bash", stream, "-", command)
+    return
+
+
+# A log of every `ls` and `cat` is not a log anyone reads. Only commands that
+# move the build forward are recorded: the gates, the build tool, and git.
+INTERESTING = ("checks/", "./checks/", "bin/", "./bin/", "mvn", "./mvnw",
+               "gradle", "./gradlew", "git ", "java ", "node ")
+
+
+def _interesting(command):
+    head = command.strip().lstrip("(").lstrip()
+    return any(head.startswith(prefix) for prefix in INTERESTING)
+
+
+def read_rows():
+    if not os.path.exists(LOG):
+        return []
+    rows = []
+    with open(LOG, encoding="utf-8") as fh:
+        for raw in fh:
+            parts = raw.rstrip("\n").split("\t")
+            if len(parts) == 5:
+                rows.append(dict(zip(("ts", "event", "stream", "actor", "detail"), parts)))
+    return rows
+
+
+def resolve(rows):
+    """Attach an agent name to every stream. See the module docstring.
+
+    A stream that ever emits a `start` is a parent: only the conversation that
+    calls the Task tool sees that event. The first stream in the log is the main
+    session for the same reason — it spawned everything after it. Every other
+    stream is a subagent, and it belongs to the newest start still unclosed.
+    """
+    parents = {r["stream"] for r in rows if r["event"] == "start"}
+    if rows:
+        parents.add(rows[0]["stream"])
+
+    owner = {s: MAIN for s in parents}
+    open_starts = []          # agent names spawned and not yet stopped
+    overlapped = False
+
+    for row in rows:
+        stream = row["stream"]
+        if row["event"] == "start":
+            if open_starts:
+                overlapped = True
+            open_starts.append(row["actor"])
+            continue
+        if stream not in owner:
+            owner[stream] = open_starts[-1] if open_starts else "?"
+        if row["event"] == "stop" and open_starts:
+            resolved = owner.get(stream)
+            if resolved in open_starts:
+                open_starts.remove(resolved)
+            else:
+                open_starts.pop()
+
+    for row in rows:
+        if row["actor"] == "-":
+            row["actor"] = owner.get(row["stream"], "?")
+    return rows, overlapped
+
+
+def cmd_show(limit):
+    rows = read_rows()
+    if not rows:
+        print("agent-log is empty: %s" % os.path.relpath(LOG, ROOT))
+        print("Nothing has run since the last `bin/agent-log clear`.")
+        return
+    rows, overlapped = resolve(rows)
+    if limit:
+        rows = rows[-limit:]
+
+    glyph = {"start": "▶", "stop": "■", "write": "✎", "bash": "$", "note": "•"}
+    width = max(len(r["actor"]) for r in rows)
+
+    print("%-19s  %-*s  %s" % ("when", width, "agent", "what"))
+    print("-" * (19 + 2 + width + 2 + 40))
+    for row in rows:
+        print("%-19s  %-*s  %s %s" % (
+            row["ts"], width, row["actor"], glyph.get(row["event"], "?"), row["detail"] or row["event"]))
+
+    if overlapped:
+        print()
+        print("WARNING: two agents overlapped. The agent name on a write line is")
+        print("         inferred from spawn order and can be wrong here.")
+
+
+def main():
+    argv = sys.argv[1:]
+    cmd = argv[0] if argv else "show"
+
+    if cmd == "hook":
+        try:
+            cmd_hook()
+        except Exception:
+            pass
+        return 0
+    if cmd == "note":
+        append("note", MAIN, "operator", " ".join(argv[1:]))
+        return 0
+    if cmd == "raw":
+        sys.stdout.write(open(LOG, encoding="utf-8").read() if os.path.exists(LOG) else "")
+        return 0
+    if cmd == "clear":
+        if os.path.exists(LOG):
+            os.remove(LOG)
+        print("cleared %s" % os.path.relpath(LOG, ROOT))
+        return 0
+    if cmd == "show":
+        limit = 0
+        if "-n" in argv:
+            try:
+                limit = int(argv[argv.index("-n") + 1])
+            except (IndexError, ValueError):
+                limit = 0
+        cmd_show(limit)
+        return 0
+
+    sys.stderr.write(__doc__.split("\n\n")[2] + "\n")
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())

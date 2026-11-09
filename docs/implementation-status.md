@@ -118,7 +118,12 @@ is not an instantiation; `examples/partner-task-service` is.
   file. There is no lock: one person builds one service at a time.
 - `prompts/system.md` — the one shared prompt. Each role prompt lives inside
   its agent file under `.claude/agents/`.
-- `.claude/` — five subagents, five slash commands, the deny rules.
+- `.claude/` — five subagents, seven slash commands, the deny rules, and the
+  hooks that feed `bin/agent-log`. One command starts each agent; the other
+  two are read-only.
+- `bin/agent-log` — the run trace: which agent ran, in what order, what it
+  wrote. Fed by hooks, not by the agents, so it records tool calls rather
+  than an agent's account of them. `bin/agent-log show` renders it.
 - `examples/partner-task-service/` — 1 endpoint, 7 behaviours, 1 upstream,
   3 approved cases, 1 deliberately open question, a clean Java sample under
   `target-sample/` so the code checks have something real to pass on.

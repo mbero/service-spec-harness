@@ -56,6 +56,7 @@ is a source of truth: `specification/`, `acceptance/`, `decisions.yaml` and
 | `reports/plan/` | the orchestrator | `implementation-plan.md`, the ordered `Sxx` steps |
 | `reports/reviews/` | the reviewer and the advisor | `Sxx.md`, `Sxx-advisor.md` — one pair per step |
 | `reports/validation/` | the implementer | check output worth keeping, measurements, probe results |
+| `reports/agent-log.tsv` | the hooks in `.claude/settings.json` | the run trace — `bin/agent-log show` renders it |
 
 Keep a review report after the finding is fixed. The record of *what was nearly
 shipped* is the most useful thing in that directory six weeks later.
@@ -67,8 +68,17 @@ shipped* is the most useful thing in that directory six weeks later.
 | | |
 |---|---|
 | `agents/` | five subagents, each carrying its own role prompt and a tool allowlist |
-| `commands/` | the slash commands that drive the loop |
-| `settings.json` | the path denials — the part that is actually enforced |
+| `commands/` | the slash commands that drive the loop — one per agent, plus the read-only ones |
+| `settings.json` | the path denials, and the hooks that feed `bin/agent-log` |
+
+The denials are the part that is enforced. The hooks are the part that is
+observed: they fire on `Task`, on `Write`/`Edit`, on an interesting `Bash`, and
+on `SubagentStop`, and they append to `reports/agent-log.tsv`. A hook never
+blocks a tool call — `bin/agent-log hook` always exits `0`, because a logger
+that can break the build gets deleted the first time it does.
+
+Hooks are read when a session starts. A hook added mid-session records nothing
+until the next one.
 
 ## The agents
 
@@ -106,13 +116,18 @@ deny rule nobody verifies is a deny rule that quietly gets deleted.
 
 ## The commands
 
-| Command | Does |
-|---|---|
-| `/spec-status` | specification coverage, open questions, blocking decisions, the lock |
-| `/spec-next` | resolves the next step, refuses if blocked, claims the lock, delegates to the implementer |
-| `/spec-review` | reviewer, then advisor — independently, in that order |
-| `/spec-check` | runs `checks/all.sh` and explains which failures belong to the step in flight |
-| `/spec-elicit` | runs the specification interview and writes the gaps it could not close |
+| Command | Does | Agent |
+|---|---|---|
+| `/spec-status` | specification coverage, open questions, blocking decisions, the lock | none |
+| `/spec-elicit` | runs the specification interview and writes the gaps it could not close | `spec-author` |
+| `/spec-plan` | decomposes the specification into the ordered `S01..Sxx` steps | `build-orchestrator` |
+| `/spec-next` | resolves the next step, refuses if blocked, claims the lock, delegates | `build-implementer` |
+| `/spec-review` | reviewer, then advisor — independently, in that order | `build-reviewer`, `independent-advisor` |
+| `/spec-check` | runs `checks/all.sh` and explains which failures belong to the step in flight | none |
+| `/spec-log` | the run trace: which agent ran, in what order, and what it wrote | none |
+
+Every agent has exactly one command that starts it. An agent with no command is
+an agent nobody runs, and the gap is invisible until someone reads both lists.
 
 `/spec-status` is a safe first command in any session: read-only, and it
 surfaces the two things that invalidate everything downstream — an unapproved
