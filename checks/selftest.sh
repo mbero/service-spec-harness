@@ -61,6 +61,34 @@ harness_check() { "$HERE/harness.sh" "$1"; }
 arch_check()    { ARCH_FILE="$1/architecture.yaml" "$HERE/architecture.sh" "$1/target-sample"; }
 tech_check()    { MANIFEST_FILE="$1/service.yaml" "$HERE/forbidden-tech.sh" "$1/target-sample"; }
 secret_check()  { MANIFEST_FILE="$1/service.yaml" "$HERE/secrets.sh" "$1/target-sample"; }
+oracle_check()  { "$HERE/oracle-integrity.sh" "$1"; }
+
+# The example ships no manifest on purpose: sealing it would mean writing into
+# examples/, which permissions.deny forbids for exactly the reason the fixture
+# exists. Each oracle case seals its own temporary copy instead.
+seal() { "$HERE/oracle-integrity.sh" --seal "$1" >/dev/null 2>&1; }
+
+# expect_pass <label> -- <command...>
+# oracle-integrity is the one gate whose PASSING case is also evidence. A hash
+# check that went red on an untouched copy would be noise, not a gate, and
+# nobody would keep it for long.
+expect_pass() {
+  local label="$1"; shift
+  [[ "${1:-}" == "--" ]] && shift
+  local out rc
+  out="$("$@" 2>&1)"; rc=$?
+  if (( rc == 0 )); then
+    PASSED=$((PASSED + 1))
+    printf '%s  ok  %s%s\n' "$_g" "$label" "$_off"
+  else
+    FAILED=$((FAILED + 1))
+    printf '%sFAIL  %s — expected exit 0, got %s%s\n' "$_r" "$label" "$rc" "$_off"
+    printf '%s\n' "$out" | sed 's/^/        /'
+  fi
+  [[ -n "$WORK" && "$WORK" == */sshself.* ]] && rm -rf "$WORK"
+  WORK=""
+  return 0
+}
 
 printf '\n--- baseline: the untouched example is green ---\n'
 for pair in "spec-completeness:spec_check" "architecture:arch_check" "forbidden-tech:tech_check"; do
@@ -126,9 +154,11 @@ expect_fail "an undecided behaviour quietly marked agreed" \
 printf '\n--- harness ---\n'
 # ---------------------------------------------------------------------------
 
-W="$(fresh)"; printf '{\n  "permissions": {\n    "deny": []\n  }\n}\n' > "$W/.claude/settings.json"
-expect_fail "the deny rule protecting the oracle removed" \
-  "permissions.deny has no Write(./acceptance/**) rule" -- harness_check "$W"
+W="$(fresh)"
+printf '{\n  "permissions": {\n    "deny": [\n      "Write(./acceptance/**)",\n      "Edit(./acceptance/**)"\n    ]\n  }\n}\n' \
+  > "$W/.claude/settings.json"
+expect_fail "a path deny on the oracle, which blocks the author and stops no shell" \
+  "blocks spec-author" -- harness_check "$W"
 
 W="$(fresh)"; perl -0777 -pi -e 's/^  mode: greenfield$/  mode: port/m' "$W/service.yaml"
 expect_fail "port mode with no oracle to point at" \
@@ -145,6 +175,40 @@ expect_fail "the spec-completeness gate dropped from validation" \
 W="$(fresh)"; perl -0777 -pi -e 's/^  base: com.example.partnertask$/  base: <<REQUIRED — base package>>/m' "$W/architecture.yaml"
 expect_fail "an unfilled marker left in a contract" \
   "unfilled marker" -- harness_check "$W"
+
+# ---------------------------------------------------------------------------
+printf '\n--- oracle-integrity ---\n'
+# ---------------------------------------------------------------------------
+# The gate that does not care which tool wrote the bytes. Each case seals a
+# copy first, then changes it the way an agent would, and the hash notices.
+
+W="$(fresh)"; seal "$W"
+expect_pass "a sealed oracle nobody touched" -- oracle_check "$W"
+
+W="$(fresh)"; seal "$W"; perl -0777 -pi -e 's/status: approved/status: draft/' "$W/acceptance/cases/A-E1-01.yaml"
+expect_fail "a case edited after it was sealed" \
+  "the oracle changed after it was sealed: acceptance/cases/A-E1-01.yaml" -- oracle_check "$W"
+
+W="$(fresh)"; seal "$W"; printf 'id: A-E1-99\n' > "$W/acceptance/cases/A-E1-99.yaml"
+expect_fail "a case slipped in after the seal" \
+  "added to the oracle since it was sealed: acceptance/cases/A-E1-99.yaml" -- oracle_check "$W"
+
+W="$(fresh)"; seal "$W"; rm -f "$W/acceptance/cases/A-E1-02.yaml"
+expect_fail "a case deleted after the seal" \
+  "removed from the oracle since it was sealed: acceptance/cases/A-E1-02.yaml" -- oracle_check "$W"
+
+W="$(fresh)"; rm -f "$W/state/oracle-manifest.sha256"
+expect_fail "approved cases with no seal recorded at all" \
+  "but state/oracle-manifest.sha256 does not" -- oracle_check "$W"
+
+# ---------------------------------------------------------------------------
+printf '\n--- oracle-guard ---\n'
+# ---------------------------------------------------------------------------
+# The guard is a hook, not a check, so it has no root to point at and nothing
+# in checks/all.sh runs it. checks/oracle-guard-cases.sh feeds it both sides:
+# every shell write refused, every read and every heredoc body let through.
+expect_pass "every oracle-guard probe lands on the right side" \
+  -- "$HERE/oracle-guard-cases.sh" "$ROOT"
 
 # ---------------------------------------------------------------------------
 printf '\n--- architecture ---\n'

@@ -41,15 +41,30 @@ built around:
 Everything else here is ordinary scaffolding. That rule is the product.
 
 `acceptance/` holds the cases that define *done*. They are written **before**
-implementation, approved by a **named human**, and **denied to the implementing
-agent at the permission layer**. The rule is enforced in three overlapping
-places, because a rule enforced in one place is a rule that eventually gets
-edited away:
+implementation and approved by a **named human**.
 
-1. `.claude/settings.json` → `permissions.deny` blocks every write to the path.
-2. `checks/harness.sh` fails if that deny rule goes missing or gets misspelled.
-3. `.claude/agents/build-reviewer.md` makes *"did this step touch `acceptance/`?"* an automatic
-   reject, independent of how good the change looks.
+**The guarantee is content, not a path rule.** A `permissions.deny` entry
+restricts the `Write` and `Edit` tools and nothing else. `Bash` is not covered,
+and every implementing agent has `Bash`, so one redirection reaches the oracle
+and the path rule never sees it. This repository used to claim otherwise. It
+does not any more, and the deny rule on `acceptance/` is gone — it blocked
+`spec-author`, the one agent that must write there, and stopped nothing else.
+
+What holds instead, in three places:
+
+1. `checks/oracle-integrity.sh` records one SHA-256 per file when a person
+   approves the cases, and fails the build when the content moved without a new
+   seal. It does not care which tool moved it.
+2. `checks/harness.sh` fails if that seal is missing where cases exist, or if a
+   path deny on `acceptance/` comes back.
+3. `bin/oracle-guard`, a `PreToolUse` hook, refuses a `Bash` command that would
+   write there — so every oracle write goes through `Write` or `Edit` and lands
+   in `reports/agent-log.tsv` where you can read it.
+   `checks/oracle-guard-cases.sh` runs the hook against both sides, so an
+   over-eager refusal shows up as a failing selftest case and not as a day lost.
+
+Point 1 is the gate. Point 3 is friction: it reads text, so a determined caller
+gets past it, and that is exactly why point 1 does not depend on it.
 
 An approval whose `by:` field looks like an agent name is itself a violation,
 reported by name.
@@ -133,6 +148,7 @@ consequence of each, or it does not count as a question.
 | `architecture.yaml` | layer boundaries as **executable** rules |
 | `specification/` | endpoints, behaviours, integrations, non-functionals |
 | `acceptance/` | **the oracle** — cases, expected bodies, upstream fixtures |
+| `state/oracle-manifest.sha256` | the seal: one SHA-256 per oracle file, taken when a person approved it |
 | `gaps/open-questions.yaml` | what nobody has decided yet |
 | `decisions.yaml` | the decision registry — every decision an agent may not take alone |
 | `checks/` | the gates, plus the selftest that proves each one can fail |
@@ -239,7 +255,7 @@ Seven commands. Five of them start an agent; two only read.
 | `/spec-plan` | `build-orchestrator` | `reports/plan/`, `state/` | Cutting the specification into ordered steps `S01..Sxx`, and refusing to schedule what an open decision gates. |
 | `/spec-next` | `build-implementer` | target code and tests, `state/` | Building **one** step. It is denied write access to `acceptance/`. |
 | `/spec-review` | `build-reviewer`, then `independent-advisor` | `reports/reviews/` | Accepting or rejecting that step. The advisor runs second and tries to prove the reviewer missed something. |
-| `/spec-check` | — | nothing | Running `checks/all.sh` and separating failures that belong to the step in flight from pre-existing ones. |
+| `/spec-check` | — | nothing | Running `checks/all.sh` — including `oracle-integrity` — and separating failures that belong to the step in flight from pre-existing ones. |
 | `/spec-log` | — | nothing | Showing which agent ran, in what order, and what it wrote. |
 
 ### Step 4 — the loop, in order
@@ -266,6 +282,17 @@ Seven commands. Five of them start an agent; two only read.
 3. **You approve the cases** — in `acceptance/cases/*.yaml`, with your own name
    in `approved.by`. An approver whose name looks like an agent is rejected by
    name. This is the step that makes the whole harness mean anything.
+
+   Then **seal** them and commit the seal:
+
+   ```sh
+   checks/oracle-integrity.sh --seal
+   git add state/oracle-manifest.sha256 acceptance/
+   ```
+
+   From here on, any change to `acceptance/` without a new seal turns
+   `checks/all.sh` red — whichever tool made it. Seal again only after you
+   approved what changed, never to make a red run green.
 4. **`/spec-plan`** — the orchestrator produces `S01..Sxx`. It refuses to plan
    while `checks/spec-completeness.sh` is red, and it names what it could not
    schedule instead of planning around it.
@@ -297,6 +324,7 @@ should not:
 | `/spec-plan` refuses | `checks/spec-completeness.sh` is red — answer questions, do not plan around them |
 | A check fails and you do not know whose fault it is | `/spec-check` splits it into *this step*, *pre-existing* and *harness* |
 | You do not know what the agents actually did | `/spec-log` |
+| `oracle-integrity` is red | somebody changed `acceptance/` after you sealed it. Read the diff before you re-seal; the step that produced it is void. |
 | The ledger and reality disagree | `state/build-state.yaml` `steps:` is the fact; `current:` is only an intention |
 
 ---
@@ -336,11 +364,14 @@ exits `1`, **and** that the output names that specific break. A check that fails
 for an unrelated reason is not evidence, so the second assertion matters as much
 as the first.
 
-Twenty-six cases, including:
+Thirty-two cases, including:
 
 - an agreed behaviour that no case proves
 - a case approved by an agent instead of a person
-- the deny rule protecting the oracle, removed
+- a path deny on `acceptance/` coming back
+- a case edited, added or deleted after a person sealed the oracle
+- a `Bash` write to the oracle that `bin/oracle-guard` must refuse, and a
+  commit message that merely names it, which it must let through
 - `evidence: "obvious"`, and evidence citing a decision that was never recorded
 - `domain` importing `infrastructure`; `@RestController` on a domain type
 - an architecture contract with its rules emptied out

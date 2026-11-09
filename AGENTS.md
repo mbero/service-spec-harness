@@ -25,10 +25,11 @@ with what the checks actually print, **the checks are right** — fix the file.
 
 ## The rules that are not negotiable
 
-- **`acceptance/` is the oracle and the implementer may not write to it.** If a
-  change here would weaken that — a deny rule removed, a check relaxed, an
-  approval field made optional — it is the wrong change, whatever problem it
-  solves.
+- **`acceptance/` is the oracle and the implementer may not write to it.** The
+  guarantee is `checks/oracle-integrity.sh`, not a path rule — see *What is
+  actually enforced*. If a change would weaken it — the seal made optional, the
+  check dropped from `all.sh`, an approval field relaxed — it is the wrong
+  change, whatever problem it solves.
 - **Never ship a check that cannot fail.** Any change under `checks/` needs a
   matching case in `checks/selftest.sh` that seeds the violation and confirms
   exit `1` naming it. `checks/harness.sh` enforces this.
@@ -57,6 +58,9 @@ is a source of truth: `specification/`, `acceptance/`, `decisions.yaml` and
 | `reports/reviews/` | the reviewer and the advisor | `Sxx.md`, `Sxx-advisor.md` — one pair per step |
 | `reports/validation/` | the implementer | check output worth keeping, measurements, probe results |
 | `reports/agent-log.tsv` | the hooks in `.claude/settings.json` | the run trace — `bin/agent-log show` renders it |
+
+`state/oracle-manifest.sha256` is **not** in this table on purpose: it is
+tracked, committed and read by a gate. Output it is not.
 
 Keep a review report after the finding is fixed. The record of *what was nearly
 shipped* is the most useful thing in that directory six weeks later.
@@ -104,15 +108,32 @@ ever does both, this harness is decoration.
 ## What is actually enforced
 
 Tool allowlists restrict *which tools*, never *which paths* — `Edit` reaches
-any file on disk. So the path rules live in `settings.json` `permissions.deny`:
+any file on disk. A path rule in `settings.json` `permissions.deny` narrows
+`Write` and `Edit`, and **nothing else**: `Bash` is not covered, and every
+implementing agent has `Bash`.
 
-| Denied | Why |
+| Denied | Why | What it does not stop |
+|---|---|---|
+| `examples/**` | the selftest fixture. Editing it to make `checks/selftest.sh` green removes the only proof the checks can fail. | a shell redirection |
+
+**`acceptance/**` is deliberately NOT denied.** That rule blocked `spec-author`
+— the one agent whose job is to write the oracle — and stopped no shell write
+at all, so the author wrote 51 cases through `Bash` heredocs and the oracle
+changed by the one route nobody could see. `checks/harness.sh` now fails if the
+rule comes back.
+
+The oracle is protected by content instead:
+
+| Mechanism | Covers |
 |---|---|
-| `acceptance/**` | the oracle. An implementer that can edit a case can make any step pass. |
-| `examples/**` | the selftest fixture. Editing it to make `checks/selftest.sh` green removes the only proof the checks can fail. |
+| `checks/oracle-integrity.sh` | every file under `acceptance/`, by SHA-256, against a seal a person took. Tool-independent. **This is the gate.** |
+| `bin/oracle-guard` (`PreToolUse` on `Bash`) | the quiet route. Refuses a shell write so every oracle change goes through `Write`/`Edit` and into `reports/agent-log.tsv`. Reads text, so it is friction, never a boundary. `checks/oracle-guard-cases.sh` holds it to both sides: it refuses every shell write, and it lets through every read and every heredoc body that only names the oracle. |
+| `checks/harness.sh` | the seal exists where cases exist; the deny rule has not returned; `examples/**` is still denied. |
 
-`checks/harness.sh` re-reads this file and fails if either rule is missing. A
-deny rule nobody verifies is a deny rule that quietly gets deleted.
+An agent with `Bash` can also run `--seal` and re-record its own tampering.
+What stops that is not a script: the manifest is committed, so a re-seal shows
+up as a changed `state/oracle-manifest.sha256` in the diff you read before
+committing — and no agent commits.
 
 ## The commands
 
@@ -144,5 +165,5 @@ A format change usually touches four files at once. Change them together:
 | an architecture rule | `architecture.yaml` only — `checks/architecture.sh` reads it, nothing is hardcoded |
 | a manifest field | `service.yaml`, `checks/harness.sh`, the example manifest |
 
-Then run `checks/selftest.sh`. If it still passes 26/26 without you having
+Then run `checks/selftest.sh`. If it still passes 32/32 without you having
 touched it, ask whether your change was actually covered.

@@ -58,11 +58,23 @@ A business rule stated only in `domain.md` and expressed by no `E<n>-B<nn>`
 | Harness (this repo) | `repositories.harness.path` | yes, except `acceptance/` |
 | Reference (port/rewrite modes only) | `repositories.reference.path` | **never** |
 
-### `acceptance/` is write-denied
+### `acceptance/` is sealed, not denied
 
-Not by convention — by `.claude/settings.json` `permissions.deny`. If you find
-yourself wanting to edit a case so a step passes, you have found either a wrong
-implementation or a wrong case. Both are reported, neither is edited by you.
+There is no path rule on it, on purpose: a `permissions.deny` entry narrows
+`Write` and `Edit` and leaves `Bash` untouched, so it only ever blocked the
+author and never the shell.
+
+`checks/oracle-integrity.sh` holds one SHA-256 per file, taken when a person
+approved the cases. Any change without a new seal fails the build, whatever
+tool made it. `bin/oracle-guard` additionally refuses a `Bash` command that
+would write there, so an oracle change you are entitled to make goes through
+`Write` or `Edit` and appears in `reports/agent-log.tsv`.
+
+**Only `spec-author` may write the oracle, and only before approval.** If you
+are any other agent and you find yourself wanting to edit a case so a step
+passes, you have found either a wrong implementation or a wrong case. Both are
+reported, neither is edited by you. Re-sealing after your own edit is the same
+act with one more step, and the committed manifest shows it.
 
 ### Git
 

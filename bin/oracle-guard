@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Refuse a Bash command that would write into acceptance/.
+
+A `PreToolUse` hook, registered on `Bash` in `.claude/settings.json`.
+
+## What it is for, and what it is not for
+
+`permissions.deny` covers the `Write` and `Edit` tools. It does not cover
+`Bash`. Without this guard the only invisible route to the oracle is the shell,
+which is exactly the route an agent reaches for when a path rule stops the
+other two.
+
+This is **not** the protection. `checks/oracle-integrity.sh` is: it hashes the
+oracle and fails the build when the content moved without a seal, whatever tool
+moved it. This guard only removes the quiet route, so that every write to the
+oracle happens through `Write` or `Edit` and therefore lands in
+`reports/agent-log.tsv` where you can see it.
+
+It reads text, so a determined caller gets past it — base64, a variable, a
+different spelling of the path. That is understood and it is why the hash check
+exists. Treat a refusal here as a nudge, never as a security boundary.
+
+## Decision rule
+
+Deny when a command segment mentions the oracle path and its leading word is
+not a known read-only one. Err towards denying: a false refusal costs one
+message, a false allow costs a silent oracle edit.
+
+Always exits 0. A hook that can crash a tool call gets deleted the first time
+it does.
+"""
+
+import json
+import re
+import sys
+
+ORACLE = "acceptance"
+
+# Reading the oracle is normal and frequent: every agent needs the cases.
+READ_ONLY = {
+    "cat", "head", "tail", "less", "more", "ls", "find", "stat", "file",
+    "grep", "egrep", "fgrep", "rg", "ack", "wc", "diff", "cmp", "md5",
+    "shasum", "sha256sum", "awk", "sort", "uniq", "comm", "cut", "tr",
+    "basename", "dirname", "realpath", "echo", "printf", "test", "true",
+    # sed prints unless it is given -i, and the -i case is caught below.
+    # perl is deliberately absent: `perl -e 'open(...)'` writes with no flag
+    # to look for, so there is nothing here to check it against.
+    "sed",
+}
+
+# The harness's own tooling reads and seals the oracle on purpose.
+ALLOWED_PREFIXES = ("checks/", "./checks/", "bin/", "./bin/")
+
+SPLIT = re.compile(r"\|\||&&|[;|\n]")
+ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def strip_heredocs(command):
+    """Drop heredoc bodies and keep the line that opens them.
+
+    `git commit -F - <<'MSG'` carries prose, and a sentence about the oracle is
+    not a write to it. The opening line keeps its redirection, so
+    `cat > acceptance/cases/a.yaml <<'EOF'` is still caught on that line.
+    """
+    kept, terminator = [], None
+    for line in command.split("\n"):
+        if terminator is not None:
+            if line.strip().strip("'\"") == terminator:
+                terminator = None
+            continue
+        kept.append(line)
+        opener = HEREDOC.search(line)
+        if opener:
+            terminator = opener.group(2)
+    return "\n".join(kept)
+
+
+def leading_word(segment):
+    """The command a segment runs, with env assignments and ( stripped."""
+    words = segment.strip().lstrip("(").strip().split()
+    for word in words:
+        if ENV_ASSIGN.match(word):
+            continue
+        return word
+    return ""
+
+
+def is_write(segment):
+    """True when this segment mentions the oracle and is not a plain read."""
+    if ORACLE not in segment:
+        return False
+
+    word = leading_word(segment)
+    if word.startswith(ALLOWED_PREFIXES):
+        return False
+
+    # A redirection into the oracle is a write however innocent the verb is:
+    # `echo x > acceptance/cases/a.yaml` leads with `echo`.
+    if re.search(r">>?\s*\S*" + ORACLE, segment):
+        return True
+
+    base = word.rsplit("/", 1)[-1]
+    if base not in READ_ONLY:
+        return True
+
+    # `sed -n` prints; `sed -i` rewrites in place.
+    if base in ("sed", "perl") and re.search(r"\s-\w*i", segment):
+        return True
+    return False
+
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+    except Exception:
+        return
+    if not isinstance(payload, dict):
+        return
+    if (payload.get("tool_name") or "") != "Bash":
+        return
+
+    args = payload.get("tool_input") or {}
+    command = args.get("command") if isinstance(args, dict) else ""
+    if not command or ORACLE not in command:
+        return
+
+    command = strip_heredocs(command)
+    if ORACLE not in command:
+        return
+
+    offending = [seg for seg in SPLIT.split(command) if is_write(seg)]
+    if not offending:
+        return
+
+    reason = (
+        "acceptance/ is the oracle. Writing it through the shell leaves no "
+        "record a reviewer can read. Use the Write or Edit tool instead — "
+        "those are logged in reports/agent-log.tsv, and "
+        "checks/oracle-integrity.sh will still fail the build if what you "
+        "wrote was never approved and sealed. Refused segment: "
+        + offending[0].strip()[:160]
+    )
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }))
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        pass
+    sys.exit(0)

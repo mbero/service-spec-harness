@@ -26,6 +26,7 @@ stage() {
 
 stage harness           "$HERE/harness.sh" "$SPEC_ROOT"
 stage spec-completeness "$HERE/spec-completeness.sh" "$SPEC_ROOT"
+stage oracle-integrity  "$HERE/oracle-integrity.sh" "$SPEC_ROOT"
 stage secrets           "$HERE/secrets.sh" $TARGET
 
 # The code checks need a target that exists. Before the first implementation

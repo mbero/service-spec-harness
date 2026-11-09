@@ -1,8 +1,5 @@
 {
   "permissions": {
-    "deny": [
-      "Write(./acceptance/**)",
-      "Edit(./acceptance/**)"
-    ]
+    "deny": []
   }
 }

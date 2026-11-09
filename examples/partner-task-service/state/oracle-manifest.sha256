@@ -1,0 +1,8 @@
+# Oracle manifest — one SHA-256 per file under acceptance/.
+# Written by checks/oracle-integrity.sh --seal. Commit it.
+# Re-seal only after a person approved what changed.
+0f2781699826b1dbb79528710264dce9a6dfee8726e572eb71e15c1a7417fb4a  acceptance/cases/A-E1-01.yaml
+a001d6c7952a0ba7433c98147fc9b7212e6746cd46e132ac2cd33c9554122db6  acceptance/cases/A-E1-02.yaml
+37725528196cbbaeacaf85a1bc22ce7c7b97e467d5246a65f7932e6bb126f94e  acceptance/cases/A-E1-03.yaml
+a514b132e674a089e4fb2d512c93928ff7255fdb7b1304caec2f97eb41839b6b  acceptance/expected/A-E1-01.json
+9fb39bd697a409a794154bfc769422c56ed3722cb8746e76b8b7d9db861385ed  acceptance/fixtures/partner-42.json

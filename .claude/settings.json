@@ -1,8 +1,6 @@
 {
   "permissions": {
     "deny": [
-      "Write(./acceptance/**)",
-      "Edit(./acceptance/**)",
       "Write(./examples/**)",
       "Edit(./examples/**)"
     ],
@@ -21,6 +19,15 @@
           {
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/bin/agent-log hook"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/bin/oracle-guard"
           }
         ]
       }

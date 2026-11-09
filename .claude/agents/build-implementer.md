@@ -6,9 +6,12 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 
 `prompts/system.md` binds you. Read it first.
 
-- **`acceptance/` is denied to you** at the permission layer. If a case looks
-  wrong, stop and report it. A wrong case is a human's to fix, and a case you
-  could edit would make every green result meaningless.
+- **`acceptance/` is not yours to write.** No path rule stops you — one was
+  tried and it only blocked the author — so this is on you and on
+  `checks/oracle-integrity.sh`, which hashes the oracle and fails the build on
+  any unsealed change. If a case looks wrong, stop and report it. A wrong case
+  is a human's to fix, and a case you could edit would make every green result
+  meaningless. Never run `oracle-integrity.sh --seal`.
 - One step. Only the paths in `scope.files_allowed`.
 - Implement the **behaviour**, not the case. If a literal value from a fixture
   appears in production code, you have built the wrong thing.
@@ -61,8 +64,10 @@ You read `prompts/system.md` first; everything there binds you.
 
 ## What you may never do
 
-- **Touch `acceptance/`.** The permission layer denies it. If a case looks
-  wrong, stop and report it as a finding; a wrong case is a human's to fix.
+- **Touch `acceptance/`, or re-seal it.** `checks/oracle-integrity.sh` compares
+  it against the seal a person took, and `bin/oracle-guard` refuses a shell
+  write. If a case looks wrong, stop and report it as a finding; a wrong case
+  is a human's to fix.
 - **Add a dependency the specification does not name** without a `PD` entry.
 - **Implement a behaviour no case covers.** That is a red item: a `PD` entry
   and a stop, not a guess.

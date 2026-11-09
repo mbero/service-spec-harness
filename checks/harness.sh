@@ -38,13 +38,23 @@ done < <(grep -rn '<<REQUIRED' \
 # The last filter drops comment lines. A file is allowed to EXPLAIN the marker
 # convention; it is not allowed to still carry an unfilled one.
 
-# --- 2. The deny rules that protect the oracle ------------------------------
+# --- 2. The deny rules, and the one that must NOT be there ------------------
+# A path deny restricts the `Write` and `Edit` tools and nothing else. `Bash`
+# is not covered, and every implementing agent has `Bash`, so a deny on
+# `acceptance/` never protected the oracle — it only blocked `spec-author`,
+# the one agent that is supposed to write there. That agent then wrote its
+# cases through shell heredocs, which is the worse outcome: the oracle still
+# changed, and the only route to it was the one nobody could see.
+#
+# The oracle is protected by content now — `checks/oracle-integrity.sh`. This
+# section checks two things: the fixture deny is still present, and the oracle
+# deny has not come back.
 SETTINGS="$HROOT/.claude/settings.json"
 if [[ ! -f "$SETTINGS" ]]; then
-  violation ".claude/settings.json is missing — nothing stops an agent writing to acceptance/"
+  violation ".claude/settings.json is missing — nothing stops an agent writing to examples/"
 else
-  MISSING="$("$PY" - "$SETTINGS" <<'PY'
-import sys, json
+  MISSING="$("$PY" - "$SETTINGS" "$HROOT" <<'PY'
+import sys, json, os
 try:
     cfg = json.load(open(sys.argv[1]))
 except Exception as exc:
@@ -52,9 +62,21 @@ except Exception as exc:
     raise SystemExit(0)
 deny = (cfg.get("permissions") or {}).get("deny") or []
 joined = " ".join(deny)
+
+# examples/ is the selftest fixture. Editing it to make checks/selftest.sh
+# green removes the only proof the checks can fail at all. An instantiation
+# ships no fixture, so the rule is required only where the directory is.
+if os.path.isdir(os.path.join(sys.argv[2], "examples")):
+    for tool in ("Write", "Edit"):
+        if f"{tool}(./examples/" not in joined and f"{tool}(examples/" not in joined:
+            print(f"permissions.deny has no {tool}(./examples/**) rule")
+
+# A deny here is a regression, not a hardening. See the comment above.
 for tool in ("Write", "Edit"):
-    if f"{tool}(./acceptance/" not in joined and f"{tool}(acceptance/" not in joined:
-        print(f"permissions.deny has no {tool}(./acceptance/**) rule")
+    if f"{tool}(./acceptance/" in joined or f"{tool}(acceptance/" in joined:
+        print(f"permissions.deny carries {tool}(./acceptance/**) — that rule blocks "
+              f"spec-author, the only agent that must write the oracle, and stops no "
+              f"Bash write at all. checks/oracle-integrity.sh protects it instead")
 PY
 )"
   while IFS= read -r line; do
