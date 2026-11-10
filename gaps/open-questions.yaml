@@ -8,6 +8,15 @@
 # A question belongs here when an agent would otherwise have to guess. A
 # question that an agent can answer from the specification does not.
 #
+# WRITE EVERY QUESTION IN ASD-STE100 — Simplified Technical English. One
+# instruction per sentence, at most 20 words. A descriptive sentence, at most
+# 25. Active voice, and name the actor. Simple tenses only. One term for one
+# thing, every time. No idiom. More than two items go in a vertical list. The
+# rule covers the `question:`, `why_it_matters:` and `options:` text. It does
+# not cover the specification those fields point at — correctness beats
+# brevity. README.md says why, under "What makes the specification different
+# from a document".
+#
 # Format:
 #
 #   - id: Q-001                 # Q-nnn, stable, never renumbered

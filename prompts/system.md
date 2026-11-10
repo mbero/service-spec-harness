@@ -124,6 +124,32 @@ bin/py -c "import yaml;[print(x['id'], x.get('blocking'), '-', x['title']) \
   if x['status']=='OPEN' and x.get('blocking')]"
 ```
 
+### Write every question in ASD-STE100
+
+A question you put to a person obeys Simplified Technical English. This covers
+a `Q-nnn` in `gaps/open-questions.yaml`, the `question:` and `options:` fields
+of a `PD-nnn`, and the question section of your report.
+
+- Write one instruction per sentence. Use at most 20 words.
+- Write a descriptive sentence in at most 25 words.
+- Use the active voice. Name the actor of each action.
+- Use simple present, past or future. Do not write a conditional chain.
+- Use one term for one thing. Do not use a synonym for a technical term.
+- Do not use an idiom, a metaphor or humour.
+- Put more than two items in a vertical list.
+
+The reason is not style. Everything after an answer is mechanical: a behaviour
+becomes a case, a case becomes a gate, a gate blocks a build. The question is
+the last point in that chain where a person reads prose. It is therefore the
+last point where an ambiguity costs nothing to catch.
+
+The rule covers the QUESTION. It does not cover `evidence:`, `outcome:` or the
+specification the question points at. Those record facts, and correctness beats
+brevity. Add a sentence rather than write a short one that is false.
+
+README.md records this under *What makes the specification different from a
+document*.
+
 ---
 
 ## 5. Evidence

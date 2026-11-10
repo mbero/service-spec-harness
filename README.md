@@ -138,6 +138,39 @@ nobody has decided yet — written precisely enough that a product owner can
 answer it in one sitting. Each question carries at least two options and the
 consequence of each, or it does not count as a question.
 
+### Every question the harness asks is written in ASD-STE100
+
+A question this harness puts to a person is written in **Simplified Technical
+English** (ASD-STE100), the aerospace maintenance-documentation standard. That
+covers a `Q-nnn` in `gaps/open-questions.yaml`, the `question:` and `options:`
+fields of a `PD-nnn` in `decisions.yaml`, and the question section of any
+agent's report.
+
+| Rule | Why it is here |
+|---|---|
+| One instruction per sentence, at most 20 words. A descriptive sentence, at most 25 | A long sentence hides a second question inside the first. The answer then covers only one of them |
+| Active voice. Name the actor | "The file is read" leaves open *by what*. In this harness that is usually the whole question |
+| Simple present, past or future only | A conditional chain describes a hypothetical. The reader must rebuild it before they can disagree with it |
+| One term for one thing, every time | A synonym reads as a new concept. "Target", "destination" and "output repository" in one question produce an answer about the wrong one |
+| No idiom, no metaphor, no humour | The reader may not share the writer's first language. A wrong reading becomes a wrong requirement |
+| More than two items go in a vertical list | A sentence with four commas is a list the reader must parse |
+
+**This is not a style preference.** Everything downstream of an answer is
+mechanical: a behaviour becomes an acceptance case, a case becomes a gate, a
+gate blocks a build. The question is the last point in that chain where a person
+reads prose. It is therefore the last point where an ambiguity costs nothing to
+catch. A misread question is paid for twice — once when the specification
+records the wrong answer, and again when the gates enforce it faithfully.
+
+The rule applies to the **question**, not to the specification around it.
+`specification/domain.md` and the `evidence:` fields stay as long as they must
+be. Correctness beats brevity: add a sentence rather than write a short one that
+is false.
+
+Nothing in `checks/` enforces this. It is a rule for whoever drafts the
+question, person or agent, and `.claude/agents/spec-author.md` repeats it at the
+point where the questions are written.
+
 ---
 
 ## What is in here

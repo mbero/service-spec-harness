@@ -28,7 +28,14 @@
 #     raised_on: "2026-11-06"
 #     raised_by: spec-author
 #     question: >
-#       One paragraph, answerable.
+#       One paragraph, answerable. WRITE IT IN ASD-STE100 — Simplified
+#       Technical English. One instruction per sentence, at most 20 words. A
+#       descriptive sentence, at most 25. Active voice, and name the actor.
+#       Simple tenses only. One term for one thing. No idiom. More than two
+#       items go in a vertical list. The same rule covers `options:` below.
+#       It does NOT cover `evidence:` or `outcome:` — those record facts, and
+#       correctness beats brevity. README.md says why, under "What makes the
+#       specification different from a document".
 #     evidence: >
 #       What is already known, with sources.
 #     options: >

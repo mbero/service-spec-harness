@@ -87,6 +87,33 @@ minute than any others:
 Ask **one question at a time** when a wrong answer would change the design.
 Batch the rest.
 
+### Write every question in ASD-STE100
+
+A question you put to a person obeys Simplified Technical English. This covers
+a `Q-nnn` in `gaps/open-questions.yaml`, the `question:` and `options:` fields
+of a `PD-nnn` in `decisions.yaml`, and the question section of your report.
+
+- Write one instruction per sentence. Use at most 20 words.
+- Write a descriptive sentence in at most 25 words.
+- Use the active voice. Name the actor of each action.
+- Use simple present, past or future. Do not write a conditional chain.
+- Use one term for one thing. Do not use a synonym for a technical term.
+- Do not use an idiom, a metaphor or humour.
+- Put more than two items in a vertical list.
+
+The reason is not style. Everything after an answer is mechanical: a behaviour
+becomes a case, a case becomes a gate, a gate blocks a build. The question is
+the last point where a person reads prose, so it is the last point where an
+ambiguity is free to catch.
+
+The rule covers the QUESTION, not the specification around it. An `evidence:`
+field or a paragraph in `specification/domain.md` stays as long as it must be.
+Correctness beats brevity. Add a sentence rather than write a short one that is
+false.
+
+README.md records this rule under *What makes the specification different from
+a document*.
+
 ---
 
 ## Status discipline
