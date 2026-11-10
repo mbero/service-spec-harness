@@ -122,6 +122,38 @@ W="$(fresh)"; perl -0777 -pi -e 's|json_exact: expected/A-E1-01.json|json_exact:
 expect_fail "json_exact pointing at a missing file" \
   "points at a missing file" -- spec_check "$W"
 
+# The five cases below cover one rule: every path a case points into
+# acceptance/ must resolve to a file. They are separate because the rule reads
+# four different key families, and because the example uses only the first of
+# them — the other three are injected, since a harness whose service has no
+# HTTP surface addresses directory trees instead and the same typo has to be
+# caught there.
+
+W="$(fresh)"; perl -0777 -pi -e 's|body_file: fixtures/partner-42.json|body_file: fixtures/partner-99.json|' "$W/acceptance/cases/A-E1-01.yaml"
+expect_fail "an HTTP stub naming a response body nobody wrote" \
+  "respond.body_file does not exist: acceptance/fixtures/partner-99.json" -- spec_check "$W"
+
+W="$(fresh)"; perl -0777 -pi -e 's|^    - integration: I1$|    - integration: I1\n      fixture: fixtures/no-such-tree.yaml|m' "$W/acceptance/cases/A-E1-01.yaml"
+expect_fail "a tree stub naming a manifest nobody wrote" \
+  "given.upstream[0].fixture does not exist: acceptance/fixtures/no-such-tree.yaml" -- spec_check "$W"
+
+W="$(fresh)"; perl -0777 -pi -e 's|^given:$|given:\n  workspace:\n    datasource: fixtures/no-such-tree.yaml|m' "$W/acceptance/cases/A-E1-01.yaml"
+expect_fail "a workspace role pointing at a manifest nobody wrote" \
+  "given.workspace.datasource does not exist" -- spec_check "$W"
+
+W="$(fresh)"; perl -0777 -pi -e 's|^then:$|then:\n  filesystem:\n    - { path: "target:assets/js/content.js", state: present, text_equals: "expected/no-such-file.js" }|m' "$W/acceptance/cases/A-E1-01.yaml"
+expect_fail "a file assertion naming an expected document nobody wrote" \
+  "then.filesystem[0].text_equals does not exist" -- spec_check "$W"
+
+# The false-positive side, and the second place in this file where a passing
+# run is the evidence. `equals_fixture` and `path` carry a `<role>:<path>` into
+# a tree that exists only while the runner is running. A rule that read them as
+# repository paths would report every file assertion in the harness as missing,
+# which is the failure mode that gets a gate deleted rather than fixed.
+W="$(fresh)"; perl -0777 -pi -e 's|^then:$|then:\n  filesystem:\n    - { path: "target:index.html", state: present, equals_fixture: "site:index.html" }|m' "$W/acceptance/cases/A-E1-01.yaml"
+expect_pass "a <role>:<path> file assertion, which names no file in this repository" \
+  -- spec_check "$W"
+
 W="$(fresh)"; perl -0777 -pi -e 's/proves: \[E1-B01, GL-B01, GL-B02\]/proves: [E1-B99]/' "$W/acceptance/cases/A-E1-01.yaml"
 expect_fail "a case proving a behaviour that does not exist" \
   "proves unknown behaviour E1-B99" -- spec_check "$W"

@@ -269,13 +269,54 @@ for path in case_files:
         if not text(when.get(field)):
             v(f"{cid}: when.{field} is missing")
 
-    for up in ((c.get("given") or {}).get("upstream") or []):
+    given = c.get("given") or {}
+
+    for up in (given.get("upstream") or []):
         iid = text(up.get("integration"))
         if iid and iid not in integration_ids:
             v(f"{cid}: given.upstream names unknown integration {iid}")
+
+    # Every path a case points into acceptance/ must resolve to a file.
+    #
+    # Collect the references first, then check them in one place, because the
+    # failure is the same failure whatever the key: nothing reads these values
+    # until the runner tries to materialise them, so a single mistyped
+    # character used to pass every gate and surface as a run-time error with
+    # no case id attached to it.
+    refs = []
+
+    for i, up in enumerate(given.get("upstream") or []):
+        # An HTTP stub names a response body; a tree stub names a manifest.
         bf = text(((up.get("respond") or {}).get("body_file")))
-        if bf and not os.path.exists(os.path.join(root, "acceptance", bf)):
-            v(f"{cid}: fixture does not exist: acceptance/{bf}")
+        if bf:
+            refs.append((f"given.upstream[{i}].respond.body_file", bf))
+        fx = text(up.get("fixture"))
+        if fx:
+            refs.append((f"given.upstream[{i}].fixture", fx))
+
+    # One manifest per role, under whichever of the two keys names the role.
+    for block in ("workspace", "external"):
+        for role, fx in sorted((given.get(block) or {}).items()):
+            fx = text(fx)
+            if fx:
+                refs.append((f"given.{block}.{role}", fx))
+
+    # text_equals and json_equals name an expected document. equals_fixture and
+    # path do not: they carry a `<role>:<path>` into a materialised tree, which
+    # exists only at run time. The shape test keeps the two apart without
+    # guessing — only a value rooted in one of the two oracle directories is a
+    # claim about a file in this repository.
+    for i, fs in enumerate(then.get("filesystem") or []):
+        if not isinstance(fs, dict):
+            continue
+        for key in ("text_equals", "json_equals"):
+            val = text(fs.get(key))
+            if val.startswith(("fixtures/", "expected/")):
+                refs.append((f"then.filesystem[{i}].{key}", val))
+
+    for where, val in refs:
+        if not os.path.exists(os.path.join(root, "acceptance", val)):
+            v(f"{cid}: {where} does not exist: acceptance/{val}")
 
 # ---------------------------------------------------------------------------
 # 4. The link that matters: every agreed behaviour is verifiable
