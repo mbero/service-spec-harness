@@ -4,16 +4,57 @@
 # checks/architecture.sh reads this file and nothing else: there is no second
 # copy of these rules in bash, so they cannot drift apart.
 #
-# The layout is hexagonal: ports and adapters around a dependency-free domain.
-# Normally the only line a new service edits is `base`. Think twice before
-# changing anything else — the value of a shared layout is that every service
-# in the estate is shaped the same way, and a one-off is worth less than it
-# looks.
+# Normally the only lines a new service edits are `pattern` and `base`. Think
+# twice before changing anything else — the value of a shared layout is that
+# every service in the estate is shaped the same way, and a one-off is worth
+# less than it looks.
 
 target:
   language: { name: Java, version: "25" }
   framework: { name: Spring MVC }
   runtime:   { reactive: false }
+
+# ---------------------------------------------------------------------------
+# The pattern — ANSWER THIS FIRST, before any step is planned.
+#
+# This file used to open with the sentence "the layout is hexagonal" and then
+# never ask. Every section below — the layer list, the package names, all five
+# import rules — is an answer to a question nobody was posed, which is the one
+# shape of decision this harness exists to prevent. The marker asks it, and
+# checks/harness.sh fails while it is unfilled.
+#
+#   hexagonal   Ports and adapters around a dependency-free domain. The domain
+#               owns the interfaces — domain.port.in, domain.port.out — and
+#               every adapter plugs into them. The rest of this file is written
+#               for this answer, so choosing it means editing nothing but
+#               `base`. It costs a port and an adapter class per external
+#               system, which on a service with one database and no
+#               integrations is ceremony.
+#   layered     api -> application -> domain -> infrastructure, each depending
+#               on the next. Cheaper to write, and the dependency on storage
+#               points the wrong way: the domain ends up importing the
+#               persistence types, which is what AR-01 and AR-02 forbid.
+#               Choose it knowingly, then relax those two rules and record why
+#               under `not-enforced`.
+#   modular-monolith
+#               Several independently-bounded modules, each internally
+#               hexagonal or layered, with an explicit rule for what may cross
+#               a module boundary. Every import rule below then needs a
+#               per-module `in_package`. That is real work — budget for it
+#               before choosing this.
+#
+# Changing `name` without changing `layers` and `import-rules` to match leaves
+# a contract that lies about itself. checks/harness.sh catches that for
+# `hexagonal`, because that claim is the one that is checkable: it requires the
+# ports to exist.
+# ---------------------------------------------------------------------------
+
+pattern:
+  name: <<REQUIRED — hexagonal | layered | modular-monolith>>
+  # Who chose it and when, or the PD id that records it. An agent must not fill
+  # this line in: the pattern governs every step an implementer takes, so it is
+  # a person's decision in the same way that agreeing a behaviour is.
+  evidence: <<REQUIRED — person and date, or a PD id>>
 
 principles:
 

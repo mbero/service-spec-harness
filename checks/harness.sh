@@ -135,6 +135,55 @@ for ph in (m.get("phases") or []):
 if tier in {"S", "M"} and len(m.get("phases") or []) > 1:
     out.append(f"tier {tier} declares {len(m['phases'])} phases — only tier L is phased")
 
+# The architecture contract declares its own pattern, and the declaration has
+# to agree with the rules underneath it. Nothing is required here when the
+# field is absent: the field was added after the worked example was frozen, and
+# the TEMPLATE carries it as an unfilled marker, so section 1 above is what
+# makes an instantiation answer. This section checks the answer.
+PATTERNS = {"hexagonal", "layered", "modular-monolith"}
+ap = os.path.join(root, "architecture.yaml")
+if os.path.exists(ap):
+    try:
+        a = yaml.safe_load(open(ap)) or {}
+    except Exception as exc:
+        a = {}
+        out.append(f"architecture.yaml is not valid YAML: {exc}")
+    pat = (a.get("pattern") or {})
+    name = pat.get("name")
+    if name:
+        if name not in PATTERNS:
+            out.append(f"architecture.yaml pattern.name '{name}' is none of "
+                       f"{', '.join(sorted(PATTERNS))} — an agent cannot follow "
+                       f"a pattern the contract does not define")
+        if not str(pat.get("evidence") or "").strip():
+            out.append("architecture.yaml declares pattern.name but no "
+                       "pattern.evidence — the pattern governs every step, so "
+                       "who chose it and when is part of the contract")
+        if name == "hexagonal":
+            # The claim is checkable, and this is the whole of it: hexagonal
+            # means the domain owns the interfaces. A contract that says
+            # hexagonal with no ports has renamed layered.
+            layers = ((a.get("package-layout") or {}).get("layers") or {})
+            pkgs = [p for layer in layers.values()
+                    for p in ((layer or {}).get("packages") or [])]
+            missing = [p for p in ("domain.port.in", "domain.port.out")
+                       if p not in pkgs]
+            if missing:
+                out.append(f"architecture.yaml declares pattern hexagonal but "
+                           f"package-layout names no {' and no '.join(missing)} "
+                           f"— without the ports the domain cannot own its own "
+                           f"interfaces, which is the only thing the word means")
+            rules = a.get("import-rules") or []
+            guards_domain = any(
+                "/domain/" in str(r.get("in_package") or "")
+                and any("adapter" in str(f.get("pattern") or "")
+                        for f in (r.get("forbidden_imports") or []))
+                for r in rules)
+            if not guards_domain:
+                out.append("architecture.yaml declares pattern hexagonal but no "
+                           "import rule stops a domain type importing an "
+                           "adapter — the pattern is then a comment")
+
 print("\n".join(out))
 PY
 )"

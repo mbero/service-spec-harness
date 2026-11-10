@@ -91,7 +91,8 @@ expect_pass() {
 }
 
 printf '\n--- baseline: the untouched example is green ---\n'
-for pair in "spec-completeness:spec_check" "architecture:arch_check" "forbidden-tech:tech_check"; do
+for pair in "spec-completeness:spec_check" "architecture:arch_check" \
+            "forbidden-tech:tech_check" "harness:harness_check"; do
   name="${pair%%:*}"; fn="${pair##*:}"
   if out="$("$fn" "$EXAMPLE" 2>&1)"; then
     PASSED=$((PASSED + 1)); printf '%s  ok  baseline %s%s\n' "$_g" "$name" "$_off"
@@ -212,6 +213,26 @@ expect_fail "the spec-completeness gate dropped from validation" \
 W="$(fresh)"; perl -0777 -pi -e 's/^  base: com.example.partnertask$/  base: <<REQUIRED — base package>>/m' "$W/architecture.yaml"
 expect_fail "an unfilled marker left in a contract" \
   "unfilled marker" -- harness_check "$W"
+
+# The three cases below cover architecture.yaml's `pattern` block. The worked
+# example predates the field and declares nothing, which is why the rule is
+# silent on an absent block — the TEMPLATE carries the field as an unfilled
+# marker, so the case above is what makes an instantiation answer at all. Each
+# case here injects a declaration into the copy and breaks it one way.
+
+W="$(fresh)"; perl -0777 -pi -e 's|^target:$|pattern:\n  name: onion\n  evidence: "selftest"\ntarget:|m' "$W/architecture.yaml"
+expect_fail "a contract naming a pattern the harness does not define" \
+  "is none of hexagonal, layered, modular-monolith" -- harness_check "$W"
+
+W="$(fresh)"; perl -0777 -pi -e 's|^target:$|pattern:\n  name: hexagonal\ntarget:|m' "$W/architecture.yaml"
+expect_fail "a pattern nobody signed" \
+  "declares pattern.name but no pattern.evidence" -- harness_check "$W"
+
+W="$(fresh)"
+perl -0777 -pi -e 's|^target:$|pattern:\n  name: hexagonal\n  evidence: "selftest"\ntarget:|m' "$W/architecture.yaml"
+perl -0777 -pi -e 's|\[domain\.model, domain\.service, domain\.port\.in, domain\.port\.out\]|[domain.model, domain.service]|' "$W/architecture.yaml"
+expect_fail "a contract that claims hexagonal and keeps no ports" \
+  "names no domain.port.in and no domain.port.out" -- harness_check "$W"
 
 # ---------------------------------------------------------------------------
 printf '\n--- oracle-integrity ---\n'
