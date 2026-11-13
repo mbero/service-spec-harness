@@ -1,6 +1,6 @@
 # Implementation status — read this first after a session restart
 
-**As of 2026-11-06.** Everything below was run and observed, not assumed.
+**As of 2026-11-09.** Everything below was run and observed, not assumed.
 
 ---
 
@@ -16,8 +16,13 @@ than a gate — see **Next step** below.
 
 **The simplification is done.** `docs/simplification-plan.md` records the
 decisions. The repository went from **82 tracked files to 62**, by merging
-files only. No capability was removed. Every number below is the state after
-that pass.
+files only. No capability was removed.
+
+**Three defects were found and fixed on 2026-11-08 and 2026-11-09**, all three
+in the machinery that was supposed to make the harness trustworthy. Each one had
+the same shape: a mechanism that looked like a guarantee and was not one. See
+**Bugs found** below. The lesson is in `AGENTS.md`: a rule nobody has watched
+fail is a rule you do not have.
 
 ---
 
@@ -28,13 +33,13 @@ that pass.
 | Path | `/Users/marcinberendt/Priv_Repo/service-spec-harness` |
 | Remote | `https://github.com/mbero/service-spec-harness.git` |
 | Branch | `main` |
-| Commits | `ce8b1e8` — the initial commit, 82 files, 4 526 insertions |
-| Working tree | **dirty** — the simplification pass is uncommitted. 20 files deleted, ~25 modified, `docs/simplification-plan.md` added |
-| Tracked files | 62, down from 82 |
+| Commits | 7, head `32f1712`. `ce8b1e8` was the initial 82-file commit |
+| Working tree | **clean** |
+| Tracked files | 71 |
 | Python | `uv sync` has been run; `.venv/` and `uv.lock` exist (pyyaml 6.0.3) |
 
-**Nothing has been pushed.** `origin` exists but has never received anything;
-pushing needs its own go-ahead.
+**`origin/main` is at `32f1712`**, confirmed with `git ls-remote`. The
+operator pushed it; no agent in this repository runs git.
 
 The initial commit carries **no ticket key**: this repository has no commit
 history and no ticket prefix in its branch name, so there was no convention to
@@ -54,7 +59,7 @@ cd /Users/marcinberendt/Priv_Repo/service-spec-harness
 
 # 1. Every gate can actually fail, for its own reason
 checks/selftest.sh
-#    → PASSED  26 selftest case(s): every check has been observed failing for its own reason
+#    → PASSED  43 selftest case(s): every check has been observed failing for its own reason
 
 # 2. The worked example is a valid, complete instantiation
 E=examples/partner-task-service
@@ -69,7 +74,7 @@ checks/harness.sh
 # 4. No organisation-specific naming leaked into the template
 #    Substitute your own org name, product names and ticket prefix:
 grep -rniE '<org>|<product>|<TICKET-PREFIX>' . --exclude-dir=.git --exclude-dir=.venv
-#    → no output (last swept 2026-11-06, clean)
+#    → no output (last swept 2026-11-09, clean)
 ```
 
 Point 3 is **expected and correct**. The `<<REQUIRED — …>>` markers are what
@@ -85,12 +90,18 @@ is not an instantiation; `examples/partner-task-service` is.
 - `acceptance/README.md` — the full case format, and the rule it enforces.
 - Case schema: `id`, `endpoint`, `proves[]`, `status`, `approved{by,date}`,
   `given{upstream[],state[]}`, `when{}`, `then{status,headers,body,absent_fields}`.
-- The write-deny on `acceptance/` is enforced in three overlapping places:
-  `.claude/settings.json` `permissions.deny`, a `checks/harness.sh` assertion
-  that the rule is still present and spelled correctly, and a mandatory reject
-  condition in `.claude/agents/build-reviewer.md`.
+- The oracle is protected by **content**, not by a path rule. A
+  `permissions.deny` entry covers `Write` and `Edit` and nothing else, and
+  every implementing agent holds `Bash`, so the old deny on `acceptance/`
+  blocked only `spec-author` — the one agent that must write there — and
+  stopped no shell write at all. Removed in `3170af6`. What holds now:
+  `checks/oracle-integrity.sh` (one SHA-256 per oracle file against a seal a
+  person took — **the gate**), `bin/oracle-guard` (a `PreToolUse` hook that
+  refuses a shell write, so the change stays visible in the log — friction,
+  never a boundary), and `checks/harness.sh`, which fails if the seal is
+  missing where cases exist **or if the deny rule comes back**.
 
-### The gates — 8 scripts in `checks/`
+### The gates — 11 scripts in `checks/`
 
 | Script | Does |
 |---|---|
@@ -100,7 +111,10 @@ is not an instantiation; `examples/partner-task-service` is.
 | `secrets.sh` | credential tripwire over the harness and the target |
 | `harness.sh` | the harness checks itself: unfilled markers, a deleted deny rule, a self-contradicting manifest, and **a check script the selftest never exercises** |
 | `all.sh` | all of the above, aggregated; no `set -e`, so one run shows the whole picture |
-| `selftest.sh` | 23 mutation cases + 3 baseline assertions = 26 |
+| `oracle-integrity.sh` | hashes every file under `acceptance/`; `--seal` records the hashes after a person approves the cases. Tool-independent, so it catches a `Bash` heredoc the same as an `Edit` |
+| `oracle-guard-cases.sh` | 36 probes at `bin/oracle-guard`: every shell write refused, every read and every heredoc body let through |
+| `agent-log-cases.sh` | 9 probes at `bin/agent-log`: synthetic hook payloads in, the agent name on each rendered line asserted |
+| `selftest.sh` | 31 mutation cases + 3 baseline assertions = 34 |
 | `_common.sh` | shared helpers; `MANIFEST_FILE` / `ARCH_FILE` / `SPEC_ROOT` overrides live here |
 
 ### Everything else
@@ -118,12 +132,17 @@ is not an instantiation; `examples/partner-task-service` is.
   file. There is no lock: one person builds one service at a time.
 - `prompts/system.md` — the one shared prompt. Each role prompt lives inside
   its agent file under `.claude/agents/`.
-- `.claude/` — five subagents, seven slash commands, the deny rules, and the
-  hooks that feed `bin/agent-log`. One command starts each agent; the other
-  two are read-only.
+- `.claude/` — five subagents, seven slash commands, the `examples/**` deny
+  rule, and the hooks that feed `bin/agent-log` and `bin/oracle-guard`. One
+  command starts each agent; the other two are read-only. Each agent file names
+  its **model**: `sonnet` for `build-implementer`, `opus` for the other four.
+  `checks/harness.sh` fails if one of them names none.
 - `bin/agent-log` — the run trace: which agent ran, in what order, what it
   wrote. Fed by hooks, not by the agents, so it records tool calls rather
-  than an agent's account of them. `bin/agent-log show` renders it.
+  than an agent's account of them. Attribution is by **interval** — a write
+  between `PreToolUse` and `PostToolUse` on one `Task` call belongs to that
+  subagent, because the parent is blocked for exactly that span.
+  `bin/agent-log show` renders it and warns when an interval never closed.
 - `examples/partner-task-service/` — 1 endpoint, 7 behaviours, 1 upstream,
   3 approved cases, 1 deliberately open question, a clean Java sample under
   `target-sample/` so the code checks have something real to pass on.
@@ -178,6 +197,9 @@ and checked for consistency but has no recorder behind it.
 | The worked example doubles as the selftest fixture | the example stays honest because breaking it breaks the test suite |
 | The selftest asserts the **message**, not just exit 1 | a check failing for an unrelated reason is not evidence |
 | No company-specific naming anywhere | explicit user instruction, 2026-11-06. Sample package is `com.example.partnertask` |
+| The oracle is sealed by content, not denied by path | a path deny covers `Write` and `Edit` only. Every implementing agent holds `Bash`. The rule blocked the author and stopped nothing else — `3170af6` |
+| `bin/oracle-guard` errs towards **allowing** | an allowlist of readers refused four harmless commands in one afternoon, and a false refusal teaches an agent to route around the guard. The hash is the gate, so the guard can afford to be permissive — `32f1712` |
+| `build-implementer` runs on a cheaper model than its reviewers | its output passes `checks/all.sh` and the acceptance cases before anyone believes it. The four agents nothing checks stay on `opus`. A hard oracle is what lets you cheapen the generator — `32f1712` |
 
 ---
 
@@ -201,6 +223,41 @@ and checked for consistency but has no recorder behind it.
    found it no longer exists — `decisions.md` and `decisions.yaml` are now one
    file, so there is nothing left to drift.
 
+The next three were found on 2026-11-08 and 2026-11-09. Each one is a mechanism
+that read as a guarantee and was not one, which makes them worth more words than
+the five above.
+
+6. **The deny rule on `acceptance/` protected nothing.** `permissions.deny`
+   narrows `Write` and `Edit`. It does not narrow `Bash`, and every implementing
+   agent holds `Bash`. The only agent the rule actually stopped was
+   `spec-author`, whose job is to write the oracle — so that agent wrote 51
+   cases through shell heredocs, and the oracle changed by the one route nobody
+   could see. The documentation claimed the opposite in four places.
+   Fixed in `3170af6`: the rule is gone, `checks/oracle-integrity.sh` hashes the
+   oracle against a seal a person took, and `checks/harness.sh` now treats the
+   deny rule's **return** as the violation.
+7. **`bin/oracle-guard` refused four harmless commands in one afternoon** —
+   including its own commit message, which merely named `acceptance/` in a
+   heredoc body, and `du -sh acceptance`. It ran an allowlist of readers and
+   denied everything unlisted. The tail of harmless commands has no end, and a
+   false refusal is worse than a false allow here: it teaches an agent to route
+   around the guard, which is the behaviour the guard exists to stop. Inverted
+   in `32f1712` to deny the writing verbs, the redirections, the in-place flags
+   and the writing `git` subcommands, and allow the rest.
+   `checks/oracle-guard-cases.sh` holds it to both sides.
+8. **The run log named the wrong agent.** It attributed work by hashing
+   `transcript_path`, assuming a subagent reports its own transcript. On a real
+   259-row log, all 259 rows carried **one** hash. `SubagentStop` was no help
+   either — it fired **118 times for 2 subagents**. Every subagent write was
+   therefore labelled `main`, and the one tool for seeing which agent did what
+   was quietly useless. Fixed in `32f1712` by bracketing with `PreToolUse` and
+   `PostToolUse` on `Task`: both fire in the parent, both carry
+   `subagent_type`, and the parent is blocked for exactly that span.
+   `checks/agent-log-cases.sh` proves the attribution.
+
+All three had been *written down* as working. None had been *watched failing*.
+That is the pattern, and `checks/*-cases.sh` is the answer to it.
+
 ---
 
 ## How to resume
@@ -212,7 +269,11 @@ and checked for consistency but has no recorder behind it.
 4. Read `examples/partner-task-service/` — faster than the format documentation.
 5. Read `docs/simplification-plan.md` and answer its four open questions, or
    note that you are deferring them.
-6. Pick up the acceptance runner.
+6. Pick up the acceptance runner. It is still the one missing piece, and it is
+   now a decided one: the first instantiation of this template settled that the
+   runner asserts the filesystem by **reading the disk**, not by trusting what
+   the service reports, and that building the runner is step `S01` — the judge
+   before the judged.
 
 If anything in this file disagrees with what the commands actually print,
 **the commands are right and this file is stale.** Fix the file.

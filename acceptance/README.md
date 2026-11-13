@@ -32,15 +32,32 @@ keep what it said. **There is nothing to record here.** So the oracle is
 
 **The implementer never writes, edits or deletes anything under `acceptance/`.**
 
-It is enforced in three places, deliberately overlapping:
+**A path rule is not what enforces it, and this file used to say it was.** A
+`permissions.deny` on `acceptance/` restricts `Write` and `Edit` and nothing
+else. `Bash` is not covered and every implementing agent has `Bash`, so one
+redirection reaches the oracle and the path rule never sees it. Worse, the rule
+blocked `spec-author` — the one agent that *must* write there — which pushed its
+cases through shell heredocs: the oracle still changed, by the only route nobody
+could see. The rule is gone, and `checks/harness.sh` now reports its **return**
+as a violation.
 
-1. `.claude/settings.json` → `permissions.deny` blocks the path for every agent
-   in the project.
-2. `checks/harness.sh` verifies rule 1 is still present and still spelled
-   correctly — a deny rule nobody checks is a deny rule that gets edited away.
-3. `.claude/agents/build-implementer.md` states it, and
-   `.claude/agents/build-reviewer.md` makes "did this
-   step touch `acceptance/`?" a mandatory reject condition.
+What holds instead, in four places, deliberately overlapping:
+
+1. `checks/oracle-integrity.sh` records one SHA-256 per file when a person
+   approves the cases, and fails the build when the content moved without a new
+   seal. It does not care which tool moved it. **This is the gate.**
+2. `checks/harness.sh` fails if that seal is missing where cases exist, or if a
+   path deny on `acceptance/` comes back.
+3. `bin/oracle-guard`, a `PreToolUse` hook on `Bash`, refuses a shell command
+   that would write here — so every oracle write goes through `Write` or `Edit`
+   and lands in `reports/agent-log.tsv` where you can read it. This is friction,
+   not a boundary: it reads text, so a determined caller gets past it, which is
+   exactly why rule 1 does not depend on it.
+   `checks/oracle-guard-cases.sh` runs the hook against both sides, so an
+   over-eager refusal surfaces as a failing selftest case and not as a lost day.
+4. `.claude/agents/build-implementer.md` states it, and
+   `.claude/agents/build-reviewer.md` makes `git status --porcelain acceptance/`
+   producing any output an automatic reject.
 
 Without this rule an agent writes the code, writes the test that the code
 passes, and reports green. That is not verification; it is the model agreeing
